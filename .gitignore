@@ -19,3 +19,8 @@
 
 # Misc
 *.log
+
+# Release artifacts + host pairing state
+/dist/
+/.rcoder/
+/.rcoder-test/
