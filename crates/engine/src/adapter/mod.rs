@@ -196,14 +196,14 @@ impl Registry {
         Ok(Registry { adapters })
     }
 
-    /// Built-ins overlaid with `$XDG_CONFIG_HOME/helm/adapters/*.toml`
+    /// Built-ins overlaid with `$XDG_CONFIG_HOME/remote-coder/adapters/*.toml`
     /// (user files win on id collision). Unreadable/broken user files are
     /// skipped with a warning — a typo must not brick the engine.
     pub fn load_builtins_and_overrides() -> Result<Self, EngineError> {
         let dir = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-            .map(|base| base.join("helm/adapters"));
+            .map(|base| base.join("remote-coder/adapters"));
         Self::load_with_overrides(dir.as_deref())
     }
 
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn override_wins_by_id_and_bad_files_are_skipped() {
-        let dir = std::env::temp_dir().join(format!("helm-adapters-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rc-adapters-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("cursor.toml"),

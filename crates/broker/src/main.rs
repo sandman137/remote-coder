@@ -1,7 +1,7 @@
 //! SSH forced-command entrypoint (DESIGN.md §8.2). Installed as:
 //!
 //! ```text
-//! command="/opt/helm/broker --session agents",no-port-forwarding,... ssh-ed25519 AAAA… helm:<device>
+//! command="/opt/rcoder/broker --session agents",no-port-forwarding,... ssh-ed25519 AAAA… rcoder:<device>
 //! ```
 //!
 //! Reads `$SSH_ORIGINAL_COMMAND`, authorizes it against the whitelist +
@@ -85,7 +85,7 @@ fn main() {
     let original = match std::env::var("SSH_ORIGINAL_COMMAND") {
         Ok(v) => v,
         Err(_) => {
-            eprintln!("helm-broker: no command supplied (interactive shells are not brokered)");
+            eprintln!("rc-broker: no command supplied (interactive shells are not brokered)");
             std::process::exit(DENY_EXIT);
         }
     };
@@ -96,12 +96,12 @@ fn main() {
             // exec replaces this process; stdio passes straight through, so
             // control-mode streaming works unchanged behind the broker.
             let err = base_command(&opts).args(&argv).exec();
-            eprintln!("helm-broker: exec tmux failed: {err}");
+            eprintln!("rc-broker: exec tmux failed: {err}");
             std::process::exit(DENY_EXIT);
         }
         Decision::Denied(reason) => {
             // Reason only — never echo pane content or key material.
-            eprintln!("helm-broker: denied: {reason}");
+            eprintln!("rc-broker: denied: {reason}");
             std::process::exit(DENY_EXIT);
         }
     }

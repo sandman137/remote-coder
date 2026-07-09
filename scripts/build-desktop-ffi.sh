@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the desktop libhelm_engine.so and generate foreign-language bindings
+# Build the desktop libremotecoder_engine.so and generate foreign-language bindings
 # (DESIGN.md §8, §12 Phase 8). Kotlin + Swift for the mobile clients; Python
 # for the runnable on-Linux FFI proof (no emulator, no JVM toolchain needed).
 #
@@ -8,9 +8,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/.dev/ffi"
-SO="$ROOT/target/debug/libhelm_engine.so"
+SO="$ROOT/target/debug/libremotecoder_engine.so"
 
-echo "building libhelm_engine.so + uniffi-bindgen…"
+echo "building libremotecoder_engine.so + uniffi-bindgen…"
 (cd "$ROOT" && cargo build -p engine-ffi)
 
 gen() {

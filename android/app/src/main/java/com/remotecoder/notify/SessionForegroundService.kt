@@ -1,4 +1,4 @@
-package com.helm.notify
+package com.remotecoder.notify
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -7,9 +7,9 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
-import com.helm.HelmApp
-import com.helm.MainActivity
-import com.helm.R
+import com.remotecoder.RemoteCoderApp
+import com.remotecoder.MainActivity
+import com.remotecoder.R
 
 /**
  * Foreground service holding a persistent notification that mirrors
@@ -34,10 +34,10 @@ class SessionForegroundService : LifecycleService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return NotificationCompat.Builder(this, HelmApp.CHANNEL_STATUS)
-            .setContentTitle("HELM")
+        return NotificationCompat.Builder(this, RemoteCoderApp.CHANNEL_STATUS)
+            .setContentTitle("Remote Coder")
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_stat_helm)
+            .setSmallIcon(R.drawable.ic_stat_rocket)
             .setOngoing(true)
             .setContentIntent(tap)
             .build()

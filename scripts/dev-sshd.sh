@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE="$ROOT/.dev/sshd"
-PORT="${HELM_SSHD_PORT:-2222}"
+PORT="${RC_SSHD_PORT:-2222}"
 USE_BROKER=0
 [[ "${1:-}" == "--broker" ]] && USE_BROKER=1
 
@@ -27,12 +27,12 @@ chmod 700 "$STATE"
 
 # Host key (throwaway, per checkout).
 if [[ ! -f "$STATE/host_ed25519" ]]; then
-  ssh-keygen -q -t ed25519 -N '' -C helm-dev-host -f "$STATE/host_ed25519"
+  ssh-keygen -q -t ed25519 -N '' -C rc-dev-host -f "$STATE/host_ed25519"
 fi
 
 # Client test key.
 if [[ ! -f "$STATE/client_ed25519" ]]; then
-  ssh-keygen -q -t ed25519 -N '' -C helm-dev-client -f "$STATE/client_ed25519"
+  ssh-keygen -q -t ed25519 -N '' -C rc-dev-client -f "$STATE/client_ed25519"
 fi
 
 # authorized_keys — optionally forced through the broker.

@@ -1,9 +1,9 @@
 //! Desktop harness: headless CLI (Phase 1) + ratatui TUI (Phase 2).
 //!
 //! The headless commands are the scriptable surface from DESIGN.md §11:
-//!   helm --transport local list
-//!   helm --transport local snapshot agents:0.0 --scrollback 200 --ansi
-//!   helm --transport local send agents:0.0 'y<Enter>'
+//!   rcoder --transport local list
+//!   rcoder --transport local snapshot agents:0.0 --scrollback 200 --ansi
+//!   rcoder --transport local send agents:0.0 'y<Enter>'
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -11,7 +11,11 @@ use engine::{ConnConfig, Engine, PaneId};
 use engine_cli::{render, tui};
 
 #[derive(Parser)]
-#[command(name = "helm", version, about = "tmux agent remote — desktop harness")]
+#[command(
+    name = "rcoder",
+    version,
+    about = "tmux agent remote — desktop harness"
+)]
 struct Cli {
     /// Transport: local | ssh
     #[arg(long, global = true, default_value = "local")]
@@ -80,7 +84,7 @@ enum Cmd {
         #[arg(long)]
         authorized_keys: Option<std::path::PathBuf>,
         /// Installed broker path written into the forced command
-        #[arg(long, default_value = "/opt/helm/broker")]
+        #[arg(long, default_value = "/opt/rcoder/broker")]
         broker_path: String,
         /// Session prefix the broker scopes to
         #[arg(long, default_value = "agents")]
@@ -95,14 +99,14 @@ enum Cmd {
         #[arg(long)]
         hostkey_pub: Option<std::path::PathBuf>,
     },
-    /// Client-side: enroll this machine using the JSON from `helm pair`
+    /// Client-side: enroll this machine using the JSON from `rcoder pair`
     Enroll {
         #[arg(long)]
         json: String,
         /// Device name to enroll as
         #[arg(long, default_value = "desktop")]
         device: String,
-        /// Key directory (default $XDG_CONFIG_HOME/helm/keys)
+        /// Key directory (default $XDG_CONFIG_HOME/remote-coder/keys)
         #[arg(long)]
         keys_dir: Option<std::path::PathBuf>,
     },

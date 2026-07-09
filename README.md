@@ -1,4 +1,4 @@
-# HELM — tmux Agent Remote
+# Remote Coder — tmux Agent Remote
 
 A secure, portable remote control for tmux-hosted coding agents (Claude Code,
 Codex, Cursor CLI, …). The phone does **not** emulate a terminal — tmux is the
@@ -18,7 +18,7 @@ exercised on Linux.
 | `crates/engine-cli` | Desktop harness: ratatui TUI + headless CLI |
 | `crates/broker` | SSH forced-command broker (host-side least privilege) |
 | `crates/notifier` | Host-side notify daemon + hook scripts |
-| `crates/engine-ffi` | UniFFI wrapper → `libhelm_engine.so` + Kotlin/Swift bindings |
+| `crates/engine-ffi` | UniFFI wrapper → `libremotecoder_engine.so` + Kotlin/Swift bindings |
 | `adapters/` | Declarative agent profiles (TOML) |
 | `fixtures/` | Fake agents + recorded control-mode streams for golden tests |
 | `scripts/` | Dev entrypoints: local tmux session, loopback sshd, local ntfy |

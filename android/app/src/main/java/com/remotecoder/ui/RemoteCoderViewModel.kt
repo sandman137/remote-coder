@@ -1,26 +1,27 @@
-package com.helm.ui
+package com.remotecoder.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.helm.engine.HelmRepository
+import com.remotecoder.engine.RemoteCoderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import uniffi.helm_engine.ButtonFfi
-import uniffi.helm_engine.EngineEventFfi
-import uniffi.helm_engine.GridSnapshotFfi
-import uniffi.helm_engine.PaneInfoFfi
+import uniffi.remotecoder_engine.ButtonFfi
+import uniffi.remotecoder_engine.EngineEventFfi
+import uniffi.remotecoder_engine.GridSnapshotFfi
+import uniffi.remotecoder_engine.PaneInfoFfi
 
 sealed interface Screen {
+    data object Splash : Screen
     data object Pairing : Screen
     data object PaneList : Screen
     data class Pane(val pane: PaneInfoFfi) : Screen
 }
 
 data class UiState(
-    val screen: Screen = Screen.Pairing,
+    val screen: Screen = Screen.Splash,
     val connected: Boolean = false,
     val session: String = "agents",
     val panes: List<PaneInfoFfi> = emptyList(),
@@ -40,8 +41,8 @@ private val defaultButtons = listOf(
     ButtonFfi("Ctrl-C", "<C-c>"),
 )
 
-class HelmViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = HelmRepository.get(app)
+class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = RemoteCoderRepository.get(app)
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -52,6 +53,14 @@ class HelmViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             repo.events.collect { onEvent(it) }
+        }
+        // Hold the cosmic splash briefly, then reveal pairing — unless a
+        // deep link (or reconnect) has already advanced the screen.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1700)
+            if (_state.value.screen is Screen.Splash) {
+                update { copy(screen = Screen.Pairing) }
+            }
         }
     }
 

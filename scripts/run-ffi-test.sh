@@ -10,16 +10,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOCKET="helm-ffi-$$"
+SOCKET="rc-ffi-$$"
 
 "$ROOT/scripts/build-desktop-ffi.sh" >/dev/null
 
 export PYTHONPATH="$ROOT/.dev/ffi/python"
-# The ctypes bindings dlopen libhelm_engine.so by name from the lib dir.
+# The ctypes bindings dlopen libremotecoder_engine.so by name from the lib dir.
 export LD_LIBRARY_PATH="$ROOT/target/debug:${LD_LIBRARY_PATH:-}"
 # UniFFI's Python loader looks for the cdylib next to the module or on the
 # path; symlink it beside the generated module.
-ln -sf "$ROOT/target/debug/libhelm_engine.so" "$ROOT/.dev/ffi/python/libhelm_engine.so"
+ln -sf "$ROOT/target/debug/libremotecoder_engine.so" "$ROOT/.dev/ffi/python/libremotecoder_engine.so"
 
 echo "running Python FFI driver…"
 python3 "$ROOT/crates/engine-ffi/tests/ffi_driver.py" "$SOCKET"

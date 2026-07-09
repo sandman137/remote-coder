@@ -1,6 +1,6 @@
-//! UniFFI surface for the HELM engine (DESIGN.md §7.3/§7.4, §12 Phase 8).
+//! UniFFI surface for the Remote Coder engine (DESIGN.md §7.3/§7.4, §12 Phase 8).
 //!
-//! The `HelmEngine` object owns a private tokio runtime and drives the real
+//! The `RemoteCoderEngine` object owns a private tokio runtime and drives the real
 //! `engine::Engine`; foreign methods are synchronous from UniFFI's view
 //! (implemented with `block_on` on the internal runtime — the robust,
 //! async-support-independent path from §7.4). Events reach native code two
@@ -44,7 +44,7 @@ pub trait EngineListener: Send + Sync {
 }
 
 #[derive(uniffi::Object)]
-pub struct HelmEngine {
+pub struct RemoteCoderEngine {
     runtime: Runtime,
     engine: Engine,
     /// Pull-model buffer, drained by `poll_events`.
@@ -56,10 +56,10 @@ pub struct HelmEngine {
 }
 
 #[uniffi::export]
-impl HelmEngine {
+impl RemoteCoderEngine {
     /// Connect and start forwarding events to the buffer (and any listener).
     #[uniffi::constructor]
-    pub fn connect(config: ConnConfigFfi) -> Result<Arc<HelmEngine>, FfiError> {
+    pub fn connect(config: ConnConfigFfi) -> Result<Arc<RemoteCoderEngine>, FfiError> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
@@ -114,7 +114,7 @@ impl HelmEngine {
             }
         });
 
-        Ok(Arc::new(HelmEngine {
+        Ok(Arc::new(RemoteCoderEngine {
             runtime,
             engine,
             buffer,

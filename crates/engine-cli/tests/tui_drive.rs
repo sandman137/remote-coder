@@ -15,7 +15,7 @@ use ratatui::Terminal;
 use engine_cli::tui::{self, App, View};
 
 fn tmux_available() -> bool {
-    if std::env::var_os("HELM_SKIP_TMUX_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_TMUX_TESTS").is_some() {
         return false;
     }
     Command::new("tmux")
@@ -40,7 +40,7 @@ struct TmuxServer {
 impl TmuxServer {
     fn start(hint: &str) -> Self {
         Self {
-            socket: format!("helm-tui-{hint}-{}", std::process::id()),
+            socket: format!("rc-tui-{hint}-{}", std::process::id()),
         }
     }
     fn run(&self, args: &[&str]) {

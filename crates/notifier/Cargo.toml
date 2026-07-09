@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "HELM host-side notify daemon: tiered attention -> privacy-filtered push (ntfy/FCM/APNs)"
+description = "Remote Coder host-side notify daemon: tiered attention -> privacy-filtered push (ntfy/FCM/APNs)"
 
 [dependencies]
 engine = { workspace = true }

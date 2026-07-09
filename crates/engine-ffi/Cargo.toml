@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "UniFFI wrapper around the HELM engine -> libhelm_engine.so + Kotlin/Swift bindings"
+description = "UniFFI wrapper around the Remote Coder engine -> libremotecoder_engine.so + Kotlin/Swift bindings"
 
 [lib]
-name = "helm_engine"
+name = "remotecoder_engine"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]

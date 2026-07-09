@@ -9,7 +9,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NAME="${1:?usage: record-fixture.sh <name> [agent-script] [seconds]}"
 AGENT="${2:-$ROOT/fixtures/agents/fake-stream.sh}"
 SECS="${3:-4}"
-SOCK="helm-record-$$"
+SOCK="rc-record-$$"
 OUT="$ROOT/fixtures/control-mode/$NAME.stream"
 
 cleanup() { tmux -L "$SOCK" kill-server 2>/dev/null || true; }

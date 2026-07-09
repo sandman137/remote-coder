@@ -12,7 +12,7 @@ use super::KeyStore;
 use crate::error::{EngineError, Result};
 use crate::transport::SshParams;
 
-/// The QR payload shown by `helm pair` (§8.3).
+/// The QR payload shown by `rcoder pair` (§8.3).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PairPayload {
     pub v: u8,

@@ -1,4 +1,4 @@
-package com.helm.engine
+package com.remotecoder.engine
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
@@ -9,25 +9,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import uniffi.helm_engine.ConnConfigFfi
-import uniffi.helm_engine.EngineEventFfi
-import uniffi.helm_engine.EngineListener
-import uniffi.helm_engine.GridSnapshotFfi
-import uniffi.helm_engine.HelmEngine
-import uniffi.helm_engine.PaneInfoFfi
-import uniffi.helm_engine.PairedHostFfi
-import uniffi.helm_engine.SessionInfoFfi
-import uniffi.helm_engine.pairEnroll
+import uniffi.remotecoder_engine.ConnConfigFfi
+import uniffi.remotecoder_engine.EngineEventFfi
+import uniffi.remotecoder_engine.EngineListener
+import uniffi.remotecoder_engine.GridSnapshotFfi
+import uniffi.remotecoder_engine.RemoteCoderEngine
+import uniffi.remotecoder_engine.PaneInfoFfi
+import uniffi.remotecoder_engine.PairedHostFfi
+import uniffi.remotecoder_engine.SessionInfoFfi
+import uniffi.remotecoder_engine.pairEnroll
 import java.io.File
 
 /**
- * The single owner of the Rust [HelmEngine]. Engine methods are `block_on`
+ * The single owner of the Rust [RemoteCoderEngine]. Engine methods are `block_on`
  * synchronous over the FFI, so every call here hops to [Dispatchers.IO]. The
  * engine's event callback is republished as a [SharedFlow] the UI collects.
  */
-class HelmRepository(private val appContext: Context) {
+class RemoteCoderRepository(private val appContext: Context) {
 
-    private var engine: HelmEngine? = null
+    private var engine: RemoteCoderEngine? = null
 
     private val _events = MutableSharedFlow<EngineEventFfi>(extraBufferCapacity = 256)
     val events: SharedFlow<EngineEventFfi> = _events.asSharedFlow()
@@ -69,7 +69,7 @@ class HelmRepository(private val appContext: Context) {
 
     private fun connect(config: ConnConfigFfi) {
         engine?.close()
-        val e = HelmEngine.connect(config)
+        val e = RemoteCoderEngine.connect(config)
         e.setListener(listener)
         engine = e
         _connected.value = true
@@ -81,7 +81,7 @@ class HelmRepository(private val appContext: Context) {
         _connected.value = false
     }
 
-    private fun require(): HelmEngine =
+    private fun require(): RemoteCoderEngine =
         engine ?: throw IllegalStateException("not connected")
 
     suspend fun listSessions(): List<SessionInfoFfi> = withContext(Dispatchers.IO) {
@@ -119,11 +119,11 @@ class HelmRepository(private val appContext: Context) {
 
     companion object {
         @Volatile
-        private var instance: HelmRepository? = null
+        private var instance: RemoteCoderRepository? = null
 
-        fun get(context: Context): HelmRepository =
+        fun get(context: Context): RemoteCoderRepository =
             instance ?: synchronized(this) {
-                instance ?: HelmRepository(context.applicationContext).also { instance = it }
+                instance ?: RemoteCoderRepository(context.applicationContext).also { instance = it }
             }
     }
 }

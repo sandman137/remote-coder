@@ -9,7 +9,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 fn tmux_available() -> bool {
-    if std::env::var_os("HELM_SKIP_TMUX_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_TMUX_TESTS").is_some() {
         return false;
     }
     Command::new("tmux")
@@ -24,7 +24,7 @@ async fn hook_script_delivers_waiting_payload() {
     if !tmux_available() {
         return;
     }
-    let socket = format!("helm-hook-{}", std::process::id());
+    let socket = format!("rc-hook-{}", std::process::id());
     let hook = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("hooks/claude-code-hook.sh")
         .canonicalize()

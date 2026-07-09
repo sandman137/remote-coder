@@ -1,8 +1,8 @@
-# HELM — tmux Agent Remote
+# Remote Coder — tmux Agent Remote
 
 **A secure, portable remote control for tmux-hosted coding agents (Claude Code, Codex, Cursor CLI, …).**
 
-> Codename `HELM` is a placeholder — rename freely. This document is the authoritative implementation spec. It is written to be executed **phase by phase**; each phase is independently buildable, has explicit acceptance criteria, and is **fully testable on a Linux dev machine** with zero Android involvement until the very last phase.
+> Codename `Remote Coder` is a placeholder — rename freely. This document is the authoritative implementation spec. It is written to be executed **phase by phase**; each phase is independently buildable, has explicit acceptance criteria, and is **fully testable on a Linux dev machine** with zero Android involvement until the very last phase.
 
 ---
 
@@ -30,7 +30,7 @@
 │  └─────────▲────────────┘  │                                      │        │ session "agents"      │    │
 │            │ UniFFI         │                                      │        │  ├─ pane: claude code │    │
 │  ┌─────────┴────────────┐  │                                      │        │  ├─ pane: codex       │    │
-│  │  HELM ENGINE (Rust)  │◄─┼──── control-mode / capture-pane ─────┼───────►│  └─ pane: cursor cli  │    │
+│  │  Remote Coder ENGINE (Rust)  │◄─┼──── control-mode / capture-pane ─────┼───────►│  └─ pane: cursor cli  │    │
 │  │  • Transport trait   │  │                                      │        └───────────────────────┘    │
 │  │  • tmux protocol     │  │        push (session_id+state only)  │  notifier ◄── Claude Code hook /    │
 │  │  • VT grid model     │  │  ◄─────────────────────────────────  │            tmux monitor-silence     │
@@ -47,7 +47,7 @@
 ## 2. Repository layout (Cargo workspace)
 
 ```
-helm/
+rcoder/
 ├── Cargo.toml                  # workspace
 ├── justfile                    # dev entrypoints (see §11)
 ├── DESIGN.md                   # this file
@@ -68,7 +68,7 @@ helm/
 │   ├── engine-cli/             # DESKTOP HARNESS: ratatui TUI + headless CLI
 │   ├── broker/                 # SSH forced-command broker (host-side bin)
 │   ├── notifier/               # host-side notify daemon + hook scripts
-│   └── engine-ffi/             # UniFFI wrapper -> libhelm_engine.so + Kotlin/Swift
+│   └── engine-ffi/             # UniFFI wrapper -> libremotecoder_engine.so + Kotlin/Swift
 ├── android/                    # Jetpack Compose app (Phase 9 only)
 ├── fixtures/
 │   ├── control-mode/           # recorded tmux -C byte streams for golden tests
@@ -237,7 +237,7 @@ hook  = ""
 transport = "tmux"
 ```
 
-Built-ins (`claude-code.toml`, `codex.toml`, `cursor.toml`) are embedded via `include_str!` **and** overridable from a config dir (`$XDG_CONFIG_HOME/helm/adapters/*.toml`). User files win on `id` collision.
+Built-ins (`claude-code.toml`, `codex.toml`, `cursor.toml`) are embedded via `include_str!` **and** overridable from a config dir (`$XDG_CONFIG_HOME/remote-coder/adapters/*.toml`). User files win on `id` collision.
 
 ### 6.2 Loader + model
 
@@ -337,7 +337,7 @@ The phone's key is installed with a forced command so it can **never** open a ge
 
 ```
 # ~/.ssh/authorized_keys on the host
-command="/opt/helm/broker",no-port-forwarding,no-x11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... helm-phone-<deviceid>
+command="/opt/rcoder/broker",no-port-forwarding,no-x11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... rc-phone-<deviceid>
 ```
 
 `broker` reads `$SSH_ORIGINAL_COMMAND`, tokenizes, and allows only:
@@ -356,14 +356,14 @@ Everything else → exit non-zero, log, deny. The session-prefix scope is enforc
 
 ### 8.3 Pairing + revocation
 
-QR payload (JSON, shown by a host-side `helm pair` command):
+QR payload (JSON, shown by a host-side `rcoder pair` command):
 
 ```json
 { "v":1, "host":"100.x.y.z", "port":22, "user":"dev",
   "hostkey_fp":"SHA256:…", "enroll":"<one-time-token>", "ttl":600 }
 ```
 
-Flow: app scans → generates ed25519 keypair **on device** (private key never leaves the secure element) → connects using the one-time enroll token → host appends the device pubkey to `authorized_keys` with the forced command → token invalidated. **Revoke** = remove that line (or `helm revoke <deviceid>`). Store `hostkey_fp` on device for pinning.
+Flow: app scans → generates ed25519 keypair **on device** (private key never leaves the secure element) → connects using the one-time enroll token → host appends the device pubkey to `authorized_keys` with the forced command → token invalidated. **Revoke** = remove that line (or `rcoder revoke <deviceid>`). Store `hostkey_fp` on device for pinning.
 
 ### 8.4 Key storage (trait + platform impls)
 
@@ -406,9 +406,9 @@ Client-side: Android **foreground service** + persistent notification mirroring 
 
 1. **Unit tests** — SGR parser, octal unescape, layout-string parser, adapter TOML loader, attention matcher, broker allow/deny, key names for `send-keys`.
 2. **Golden tests** — recorded control-mode byte streams in `fixtures/control-mode/*.bin` replayed through the parser + VT grid; assert `GridSnapshot`. Deterministic, no tmux needed → CI-safe.
-3. **Integration tests** — spawn a **real tmux server on a private socket** (`tmux -L helm-test -f /dev/null`), run a **fake agent** script in a pane, drive it through `LocalTransport`, assert grid + attention + button behavior. Requires tmux on the dev box only.
+3. **Integration tests** — spawn a **real tmux server on a private socket** (`tmux -L rc-test -f /dev/null`), run a **fake agent** script in a pane, drive it through `LocalTransport`, assert grid + attention + button behavior. Requires tmux on the dev box only.
 4. **Loopback SSH tests** — `SshTransport` → `127.0.0.1:2222` (dev sshd) → broker → tmux. Proves auth, pinning, control-mode-over-SSH, and broker scoping on one machine.
-5. **FFI tests** — a **JVM/Kotlin test on desktop** loads the desktop-built `libhelm_engine.so` via the generated UniFFI Kotlin bindings (JNA-based, runs on desktop JVM) and drives the engine. Proves the FFI boundary **without an Android emulator**.
+5. **FFI tests** — a **JVM/Kotlin test on desktop** loads the desktop-built `libremotecoder_engine.so` via the generated UniFFI Kotlin bindings (JNA-based, runs on desktop JVM) and drives the engine. Proves the FFI boundary **without an Android emulator**.
 
 ### 10.2 Fake agents (`fixtures/agents/`)
 
@@ -520,7 +520,7 @@ Each phase: **Goal → Deliverables → Acceptance (automated) → Local verific
 
 ### Phase 6 — Broker + pairing + keystore
 - **Goal:** least-privilege access, revocable devices, hardware-key abstraction.
-- **Deliverables:** `broker` bin (whitelist + session scoping), `helm pair` (QR generate) + enroll flow, revocation, `KeyStore` trait + desktop impl (`keyring`).
+- **Deliverables:** `broker` bin (whitelist + session scoping), `rcoder pair` (QR generate) + enroll flow, revocation, `KeyStore` trait + desktop impl (`keyring`).
 - **Acceptance:** pure broker allow/deny tests (§10.4); an end-to-end loopback test where the phone key is installed with `command="broker"` and a denied command fails while an allowed one succeeds; a pairing round-trip test using the desktop keystore.
 - **Local verify:** `just sshd` with the broker as forced command; `just tui-ssh` still works; attempting an out-of-scope `capture-pane -t other:…` is rejected (add a `--raw` debug flag to the CLI to try it).
 
@@ -538,7 +538,7 @@ Each phase: **Goal → Deliverables → Acceptance (automated) → Local verific
 
 ### Phase 9 — Android app (only now touch a device/emulator)
 - **Goal:** ship the Android client.
-- **Deliverables:** Compose UI (session/pane list, grid renderer, button row, text+STT input, scrollback), `cargo-ndk` build of `libhelm_engine.so` into `jniLibs`, Android `KeyStore` impl (StrongBox + biometric), FCM registration + foreground service + persistent notification, QR scanner for pairing, deep-link on notification tap.
+- **Deliverables:** Compose UI (session/pane list, grid renderer, button row, text+STT input, scrollback), `cargo-ndk` build of `libremotecoder_engine.so` into `jniLibs`, Android `KeyStore` impl (StrongBox + biometric), FCM registration + foreground service + persistent notification, QR scanner for pairing, deep-link on notification tap.
 - **Acceptance:** app builds; on the **x86_64 emulator** it connects via `adb reverse tcp:2222 tcp:2222` to the loopback sshd/broker/tmux and reproduces the TUI flows; biometric-gated signing works; a waiting fake agent produces an FCM (or ntfy) notification with no code.
 - **Local verify:** everything runs on the Linux box's emulator against loopback — no physical device, no repeated "download to Android."
 

@@ -3,4 +3,4 @@
 -keep class uniffi.** { *; }
 -keepclassmembers class uniffi.** { *; }
 # Firebase messaging entry points.
--keep class com.helm.notify.** { *; }
+-keep class com.remotecoder.notify.** { *; }

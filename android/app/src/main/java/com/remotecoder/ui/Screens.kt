@@ -1,4 +1,4 @@
-package com.helm.ui
+package com.remotecoder.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,7 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import uniffi.helm_engine.PaneInfoFfi
+import uniffi.remotecoder_engine.PaneInfoFfi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +42,7 @@ fun PaneListScreen(
     onRefresh: () -> Unit,
 ) {
     Scaffold(topBar = {
-        TopAppBar(title = { Text("HELM — $session (${panes.size} panes)") })
+        TopAppBar(title = { Text("Remote Coder — $session (${panes.size} panes)") })
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
             items(panes, key = { it.id }) { pane ->

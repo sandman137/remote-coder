@@ -57,7 +57,7 @@ fn draw_list(frame: &mut Frame, app: &mut App) {
         .collect();
 
     let title = format!(
-        " HELM — session: {} ({} panes) ",
+        " Remote Coder — session: {} ({} panes) ",
         app.session,
         app.panes.len()
     );

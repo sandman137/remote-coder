@@ -1,4 +1,4 @@
-package com.helm
+package com.remotecoder
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,21 +7,22 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
-import com.helm.notify.SessionForegroundService
-import com.helm.ui.HelmTheme
-import com.helm.ui.HelmViewModel
-import com.helm.ui.PaneListScreen
-import com.helm.ui.PaneScreen
-import com.helm.ui.PairingScreen
-import com.helm.ui.Screen
+import com.remotecoder.notify.SessionForegroundService
+import com.remotecoder.ui.RemoteCoderTheme
+import com.remotecoder.ui.RemoteCoderViewModel
+import com.remotecoder.ui.PaneListScreen
+import com.remotecoder.ui.PaneScreen
+import com.remotecoder.ui.PairingScreen
+import com.remotecoder.ui.Screen
+import com.remotecoder.ui.SplashScreen
 
 /**
  * Single-activity Compose host. FragmentActivity so BiometricPrompt works.
- * Notification taps deep-link here via helm://pane/<session>/<paneId>.
+ * Notification taps deep-link here via remotecoder://pane/<session>/<paneId>.
  */
 class MainActivity : FragmentActivity() {
 
-    private val vm: HelmViewModel by viewModels()
+    private val vm: RemoteCoderViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,9 +30,12 @@ class MainActivity : FragmentActivity() {
         SessionForegroundService.start(this)
 
         setContent {
-            HelmTheme {
+            RemoteCoderTheme {
                 val state by vm.state.collectAsState()
                 when (state.screen) {
+                    is Screen.Splash -> SplashScreen(
+                        status = state.status.ifEmpty { "connecting to tailnet" },
+                    )
                     is Screen.Pairing -> PairingScreen(
                         error = state.error,
                         onScanned = { vm.pairAndConnect(it, deviceName()) },
@@ -79,7 +83,7 @@ class MainActivity : FragmentActivity() {
             // Debug-only: drive the REAL pairing+connect path with a payload
             // (the QR scanner can't be automated over adb). Not available in
             // release builds. `adb shell am start -a android.intent.action.VIEW
-            //   -d helm://connect --es payload '<json>' --es device emu`
+            //   -d remotecoder://connect --es payload '<json>' --es device emu`
             "connect" -> if (isDebuggable()) {
                 val payload = intent.getStringExtra("payload")
                     ?: data.getQueryParameter("payload")

@@ -1,6 +1,6 @@
 //! Integration tests (DESIGN.md §10.1 layer 3): a real tmux server on a
 //! private socket, a fake agent in a pane, driven through `LocalTransport`.
-//! Requires tmux on the dev box; set HELM_SKIP_TMUX_TESTS=1 to opt out.
+//! Requires tmux on the dev box; set RC_SKIP_TMUX_TESTS=1 to opt out.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -9,8 +9,8 @@ use std::time::Duration;
 use engine::{ConnConfig, Engine, GridSnapshot, KeyInput, PaneId};
 
 fn tmux_available() -> bool {
-    if std::env::var_os("HELM_SKIP_TMUX_TESTS").is_some() {
-        eprintln!("HELM_SKIP_TMUX_TESTS set — skipping tmux integration test");
+    if std::env::var_os("RC_SKIP_TMUX_TESTS").is_some() {
+        eprintln!("RC_SKIP_TMUX_TESTS set — skipping tmux integration test");
         return false;
     }
     Command::new("tmux")
@@ -35,7 +35,7 @@ struct TmuxServer {
 
 impl TmuxServer {
     fn start(hint: &str) -> Self {
-        let socket = format!("helm-test-{hint}-{}", std::process::id());
+        let socket = format!("rc-test-{hint}-{}", std::process::id());
         Self { socket }
     }
 
@@ -198,7 +198,7 @@ async fn missing_server_yields_empty_sessions() {
         return;
     }
     let engine = Engine::connect(ConnConfig::Local {
-        socket: Some(format!("helm-test-nosuch-{}", std::process::id())),
+        socket: Some(format!("rc-test-nosuch-{}", std::process::id())),
     })
     .await
     .unwrap();

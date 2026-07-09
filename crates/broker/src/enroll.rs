@@ -1,6 +1,6 @@
 //! Host-side pairing (DESIGN.md §8.3): one-time enroll tokens, an
 //! authorized_keys manager (append with forced command / revoke by device),
-//! and a tiny single-shot TCP enroll listener the `helm pair` command runs
+//! and a tiny single-shot TCP enroll listener the `rcoder pair` command runs
 //! inside the tailnet. std-only — the broker stays lean.
 
 use std::io::{BufRead, BufReader, Write};
@@ -8,9 +8,9 @@ use std::net::TcpListener;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-/// Marker comment identifying HELM-managed authorized_keys lines.
+/// Marker comment identifying Remote Coder-managed authorized_keys lines.
 fn marker(device: &str) -> String {
-    format!("helm:{device}")
+    format!("rcoder:{device}")
 }
 
 pub fn generate_token() -> String {
@@ -72,13 +72,13 @@ pub fn revoke(path: &Path, device: &str) -> std::io::Result<bool> {
     Ok(removed)
 }
 
-/// Devices currently authorized via HELM-managed lines.
+/// Devices currently authorized via Remote Coder-managed lines.
 pub fn list_devices(path: &Path) -> Vec<String> {
     std::fs::read_to_string(path)
         .unwrap_or_default()
         .lines()
         .filter_map(|l| {
-            l.rsplit_once(" helm:")
+            l.rsplit_once(" rcoder:")
                 .map(|(_, device)| device.trim().to_string())
         })
         .collect()
@@ -192,7 +192,7 @@ mod tests {
     use super::*;
 
     fn tmp(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("helm-enroll-{name}-{}", std::process::id()))
+        std::env::temp_dir().join(format!("rc-enroll-{name}-{}", std::process::id()))
     }
 
     #[test]
@@ -204,22 +204,28 @@ mod tests {
             &path,
             "pixel8",
             "ssh-ed25519 AAAATESTKEY client-comment",
-            "/opt/helm/broker --session agents",
+            "/opt/rcoder/broker --session agents",
         )
         .unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("command=\"/opt/helm/broker --session agents\""));
+        assert!(content.contains("command=\"/opt/rcoder/broker --session agents\""));
         assert!(content.contains("no-pty"));
-        assert!(content.contains("ssh-ed25519 AAAATESTKEY helm:pixel8"));
+        assert!(content.contains("ssh-ed25519 AAAATESTKEY rcoder:pixel8"));
         assert!(
             !content.contains("client-comment"),
             "client comment must be stripped"
         );
 
         // Re-enrolling the same device replaces its key.
-        add_authorized_key(&path, "pixel8", "ssh-ed25519 NEWKEY x", "/opt/helm/broker").unwrap();
+        add_authorized_key(
+            &path,
+            "pixel8",
+            "ssh-ed25519 NEWKEY x",
+            "/opt/rcoder/broker",
+        )
+        .unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(content.matches("helm:pixel8").count(), 1);
+        assert_eq!(content.matches("rcoder:pixel8").count(), 1);
         assert!(content.contains("NEWKEY"));
 
         assert_eq!(list_devices(&path), vec!["pixel8"]);
@@ -231,14 +237,14 @@ mod tests {
     }
 
     #[test]
-    fn foreign_lines_survive_helm_management() {
+    fn foreign_lines_survive_rcoder_management() {
         let path = tmp("foreign");
         std::fs::write(&path, "ssh-rsa USERKEY user@laptop\n").unwrap();
         add_authorized_key(&path, "d1", "ssh-ed25519 K1 c", "/b").unwrap();
         revoke(&path, "d1").unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("USERKEY"));
-        assert!(!content.contains("helm:"));
+        assert!(!content.contains("rcoder:"));
         std::fs::remove_file(&path).ok();
     }
 

@@ -13,7 +13,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 fn tmux_available() -> bool {
-    if std::env::var_os("HELM_SKIP_TMUX_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_TMUX_TESTS").is_some() {
         return false;
     }
     Command::new("tmux")
@@ -38,7 +38,7 @@ struct TmuxServer {
 impl TmuxServer {
     fn start(hint: &str) -> Self {
         Self {
-            socket: format!("helm-notify-{hint}-{}", std::process::id()),
+            socket: format!("rc-notify-{hint}-{}", std::process::id()),
         }
     }
     fn run(&self, args: &[&str]) {
@@ -116,7 +116,7 @@ async fn tier3_pushes_code_free_payload_when_unattached() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let sink = std::sync::Arc::new(
-        notifier::NtfySink::from_url(&format!("http://127.0.0.1:{port}"), "helm-test").unwrap(),
+        notifier::NtfySink::from_url(&format!("http://127.0.0.1:{port}"), "rc-test").unwrap(),
     );
 
     // The daemon under test (library entry — the same code `notifier watch` runs).
@@ -136,7 +136,7 @@ async fn tier3_pushes_code_free_payload_when_unattached() {
     daemon.abort();
 
     // Delivered where we said, with the content-free title.
-    assert!(head.starts_with("POST /helm-test HTTP/1.1"), "head: {head}");
+    assert!(head.starts_with("POST /rc-test HTTP/1.1"), "head: {head}");
     assert!(head.contains("Title: fake-yn needs input"), "head: {head}");
 
     // Exactly the whitelisted fields (§8.5)…
@@ -192,7 +192,7 @@ async fn tier2_silence_pushes_after_stall() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let sink = std::sync::Arc::new(
-        notifier::NtfySink::from_url(&format!("http://127.0.0.1:{port}"), "helm-test").unwrap(),
+        notifier::NtfySink::from_url(&format!("http://127.0.0.1:{port}"), "rc-test").unwrap(),
     );
 
     let daemon = tokio::spawn(notifier::watch::run(

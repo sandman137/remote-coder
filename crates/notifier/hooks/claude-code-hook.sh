@@ -5,7 +5,7 @@
 #   {
 #     "hooks": {
 #       "Notification": [{ "matcher": "", "hooks": [
-#         { "type": "command", "command": "/opt/helm/claude-code-hook.sh" }
+#         { "type": "command", "command": "/opt/rcoder/claude-code-hook.sh" }
 #       ]}]
 #     }
 #   }

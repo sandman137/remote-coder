@@ -9,7 +9,7 @@ use std::time::Duration;
 use engine::{ConnConfig, Engine, EngineEvent, EventStream, PaneId, PromptKind};
 
 fn tmux_available() -> bool {
-    if std::env::var_os("HELM_SKIP_TMUX_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_TMUX_TESTS").is_some() {
         return false;
     }
     Command::new("tmux")
@@ -34,7 +34,7 @@ struct TmuxServer {
 impl TmuxServer {
     fn start(hint: &str) -> Self {
         Self {
-            socket: format!("helm-attn-{hint}-{}", std::process::id()),
+            socket: format!("rc-attn-{hint}-{}", std::process::id()),
         }
     }
     fn run(&self, args: &[&str]) {
@@ -222,7 +222,7 @@ async fn launch_agent_creates_window_running_adapter_cmd() {
 
     // Override registry: a launcher adapter pointing at the fixture by
     // absolute path — also exercises Registry DI + user-override loading.
-    let dir = std::env::temp_dir().join(format!("helm-launch-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("rc-launch-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("launchable.toml"),

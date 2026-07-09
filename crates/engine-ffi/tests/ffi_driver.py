@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """FFI boundary proof on Linux (DESIGN.md §10.1 layer 5, §12 Phase 8).
 
-Loads the desktop-built libhelm_engine.so through the generated UniFFI
+Loads the desktop-built libremotecoder_engine.so through the generated UniFFI
 Python (ctypes) bindings and drives the engine end to end — connect,
 enumerate, snapshot, send keys, press an adapter button, and receive events
 via BOTH poll_events and the EngineListener callback. This is the runnable
@@ -17,7 +17,7 @@ import sys
 import time
 import threading
 
-import helm_engine as h
+import remotecoder_engine as h
 
 
 def log(msg):
@@ -89,7 +89,7 @@ def main():
              os.path.join(fixtures, "fake-yn.sh"))
 
         # ---- connect over the FFI boundary ----
-        engine = h.HelmEngine.connect(h.ConnConfigFfi.LOCAL(socket=socket))
+        engine = h.RemoteCoderEngine.connect(h.ConnConfigFfi.LOCAL(socket=socket))
         log("connected")
 
         listener = CollectingListener()

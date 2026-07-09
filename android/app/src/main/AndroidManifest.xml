@@ -11,30 +11,30 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
-        android:name=".HelmApp"
+        android:name=".RemoteCoderApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Helm">
+        android:theme="@style/Theme.RemoteCoder">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.Helm">
+            android:theme="@style/Theme.RemoteCoder">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Notification deep-link: helm://pane/<session>/<paneId>
-                 Debug-only test trigger: helm://connect (see MainActivity) -->
+            <!-- Notification deep-link: remotecoder://pane/<session>/<paneId>
+                 Debug-only test trigger: remotecoder://connect (see MainActivity) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="helm" android:host="pane" />
-                <data android:scheme="helm" android:host="connect" />
+                <data android:scheme="remotecoder" android:host="pane" />
+                <data android:scheme="remotecoder" android:host="connect" />
             </intent-filter>
         </activity>
 

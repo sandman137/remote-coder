@@ -1,4 +1,4 @@
-package com.helm
+package com.remotecoder
 
 import android.app.Application
 import android.app.NotificationChannel
@@ -10,7 +10,7 @@ import android.content.Context
  * service (persistent "connected" state, the iOS-Live-Activity equivalent)
  * and by attention pushes.
  */
-class HelmApp : Application() {
+class RemoteCoderApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -31,7 +31,7 @@ class HelmApp : Application() {
     }
 
     companion object {
-        const val CHANNEL_STATUS = "helm.status"
-        const val CHANNEL_ATTENTION = "helm.attention"
+        const val CHANNEL_STATUS = "rcoder.status"
+        const val CHANNEL_ATTENTION = "rcoder.attention"
     }
 }

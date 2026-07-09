@@ -1,4 +1,4 @@
-//! HELM engine — the platform-agnostic core.
+//! Remote Coder engine — the platform-agnostic core.
 //!
 //! Everything security-critical and platform-independent lives here:
 //! transport (local/SSH), tmux protocol, grid model, agent adapters,

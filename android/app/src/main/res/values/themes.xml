@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Compose owns the real theming (ui/Theme.kt); this is the launch/system
-         theme applied before Compose takes over. -->
-    <style name="Theme.Helm" parent="android:Theme.Material.NoActionBar" />
+         theme applied before Compose takes over. Cosmic-lavender window so
+         cold start doesn't flash white. -->
+    <style name="Theme.RemoteCoder" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/cosmic_bg</item>
+        <item name="android:statusBarColor">@color/cosmic_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

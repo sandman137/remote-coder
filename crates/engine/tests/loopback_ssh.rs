@@ -3,7 +3,7 @@
 //! control-mode-over-SSH on one machine. The Phase-1 (snapshot/send) and
 //! Phase-3 (streaming) assertions rerun unchanged over the SSH transport.
 //!
-//! Needs /usr/sbin/sshd + ssh-keygen; set HELM_SKIP_SSH_TESTS=1 to opt out.
+//! Needs /usr/sbin/sshd + ssh-keygen; set RC_SKIP_SSH_TESTS=1 to opt out.
 
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use engine::{ConnConfig, Engine, EngineEvent, EventStream, PaneId, SshParams, Tr
 const SSHD_BIN: &str = "/usr/sbin/sshd";
 
 fn ssh_tests_enabled() -> bool {
-    if std::env::var_os("HELM_SKIP_SSH_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_SSH_TESTS").is_some() {
         return false;
     }
     if !Path::new(SSHD_BIN).exists() {
@@ -82,15 +82,15 @@ struct SshFixture {
 
 impl SshFixture {
     fn start(hint: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("helm-ssh-{hint}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rc-ssh-{hint}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let tmux_socket = format!("helm-ssh-{hint}-{}", std::process::id());
+        let tmux_socket = format!("rc-ssh-{hint}-{}", std::process::id());
         let port = free_port();
 
         let host_key = dir.join("host_ed25519");
         let client_key = dir.join("client_ed25519");
-        keygen(&host_key, "helm-test-host");
-        keygen(&client_key, "helm-test-client");
+        keygen(&host_key, "rc-test-host");
+        keygen(&client_key, "rc-test-client");
         let host_fp = host_fingerprint(&dir.join("host_ed25519.pub"));
 
         // Forced command: rewrite a leading "tmux" into "tmux -L <socket>".

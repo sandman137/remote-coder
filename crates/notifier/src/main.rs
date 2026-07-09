@@ -17,14 +17,14 @@ use notifier::{watch, AgentState, FcmStubSink, NtfySink, Payload, Sink, StdoutSi
 #[command(
     name = "notifier",
     version,
-    about = "HELM push notifier (code-free payloads)"
+    about = "Remote Coder push notifier (code-free payloads)"
 )]
 struct Cli {
     /// ntfy base url (default $NTFY_URL or http://127.0.0.1:2586)
     #[arg(long, global = true)]
     ntfy_url: Option<String>,
 
-    /// ntfy topic (default $NTFY_TOPIC or "helm")
+    /// ntfy topic (default $NTFY_TOPIC or "rcoder")
     #[arg(long, global = true)]
     ntfy_topic: Option<String>,
 
@@ -92,7 +92,7 @@ fn sink_from(cli: &Cli) -> Result<Arc<dyn Sink>> {
         .ntfy_topic
         .clone()
         .or_else(|| std::env::var("NTFY_TOPIC").ok())
-        .unwrap_or_else(|| "helm".to_string());
+        .unwrap_or_else(|| "rcoder".to_string());
     Ok(Arc::new(
         NtfySink::from_url(&url, &topic).map_err(|e| anyhow::anyhow!("{e}"))?,
     ))

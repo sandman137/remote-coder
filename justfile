@@ -1,4 +1,4 @@
-# HELM dev entrypoints (DESIGN.md §11).
+# Remote Coder dev entrypoints (DESIGN.md §11).
 # Daily loop: `just fake-session` once, then iterate with `just tui`.
 
 # --- local, no SSH, no Android ---

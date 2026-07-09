@@ -219,9 +219,9 @@ mod tests {
 
     #[test]
     fn ntfy_url_parsing() {
-        assert!(NtfySink::from_url("http://127.0.0.1:2586", "helm").is_ok());
-        assert!(NtfySink::from_url("http://ntfy.internal", "helm").is_ok());
-        assert!(NtfySink::from_url("https://ntfy.sh", "helm").is_err());
-        assert!(NtfySink::from_url("ftp://x", "helm").is_err());
+        assert!(NtfySink::from_url("http://127.0.0.1:2586", "rcoder").is_ok());
+        assert!(NtfySink::from_url("http://ntfy.internal", "rcoder").is_ok());
+        assert!(NtfySink::from_url("https://ntfy.sh", "rcoder").is_err());
+        assert!(NtfySink::from_url("ftp://x", "rcoder").is_err());
     }
 }

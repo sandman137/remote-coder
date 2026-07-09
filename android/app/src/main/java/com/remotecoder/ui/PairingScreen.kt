@@ -1,4 +1,4 @@
-package com.helm.ui
+package com.remotecoder.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -36,8 +36,8 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
 /**
- * Pairing screen: scan the QR shown by `helm pair`. On a decoded payload we
- * run the enroll flow ([HelmViewModel.pairAndConnect]) — key generated on
+ * Pairing screen: scan the QR shown by `rcoder pair`. On a decoded payload we
+ * run the enroll flow ([RemoteCoderViewModel.pairAndConnect]) — key generated on
  * device, host key pinned, forced-command key installed host-side.
  */
 @Composable
@@ -64,7 +64,7 @@ fun PairingScreen(
     ) {
         Text("Pair with your dev host", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Run  helm pair --pair-host <tailnet-ip>  on the host and scan its QR.",
+            "Run  rcoder pair --pair-host <tailnet-ip>  on the host and scan its QR.",
             style = MaterialTheme.typography.bodyMedium,
         )
 

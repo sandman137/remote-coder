@@ -9,17 +9,17 @@ plugins {
 }
 
 android {
-    namespace = "com.helm"
+    namespace = "com.remotecoder"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.helm"
+        applicationId = "com.remotecoder"
         minSdk = 28 // StrongBox + BiometricPrompt
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
         ndk {
-            abiFilters += project.property("helm.rustAbis").toString().split(",")
+            abiFilters += project.property("rcoder.rustAbis").toString().split(",")
         }
     }
 
@@ -84,11 +84,11 @@ dependencies {
 // .so and bindings automatically (DESIGN.md §11).
 
 val rustRoot = rootProject.projectDir.parentFile // repo root
-val abis = project.property("helm.rustAbis").toString().split(",")
+val abis = project.property("rcoder.rustAbis").toString().split(",")
 
 val cargoNdkBuild by tasks.registering(Exec::class) {
     group = "rust"
-    description = "Cross-build libhelm_engine.so into jniLibs via cargo-ndk"
+    description = "Cross-build libremotecoder_engine.so into jniLibs via cargo-ndk"
     workingDir = rustRoot
     val jniOut = layout.buildDirectory.dir("rustJniLibs").get().asFile
     val args = mutableListOf("ndk")
@@ -106,7 +106,7 @@ val uniffiBindgen by tasks.registering(Exec::class) {
     val outDir = layout.buildDirectory.dir("generated/uniffi").get().asFile
     // Any built ABI's .so carries the same metadata; use the first.
     val so = layout.buildDirectory
-        .file("rustJniLibs/${abis.first()}/libhelm_engine.so").get().asFile
+        .file("rustJniLibs/${abis.first()}/libremotecoder_engine.so").get().asFile
     commandLine(
         "cargo", "run", "-q", "-p", "engine-ffi", "--bin", "uniffi-bindgen", "--",
         "generate", "--library", so.absolutePath, "--language", "kotlin", "--out-dir", outDir.absolutePath

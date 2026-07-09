@@ -47,12 +47,12 @@ impl FileKeyStore {
         Ok(FileKeyStore { dir })
     }
 
-    /// Default location: `$XDG_CONFIG_HOME/helm/keys` (or ~/.config/helm/keys).
+    /// Default location: `$XDG_CONFIG_HOME/remote-coder/keys` (or ~/.config/remote-coder/keys).
     pub fn default_dir() -> Option<PathBuf> {
         std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-            .map(|base| base.join("helm/keys"))
+            .map(|base| base.join("remote-coder/keys"))
     }
 
     /// Path to the private key file — what `SshParams::key_path` wants.
@@ -110,7 +110,7 @@ impl KeyStore for FileKeyStore {
         getrandom::fill(&mut seed).map_err(|e| EngineError::Parse(format!("os rng: {e}")))?;
         let keypair = Ed25519Keypair::from_seed(&seed);
         let mut key = PrivateKey::from(keypair);
-        key.set_comment(format!("helm-device-{alias}"));
+        key.set_comment(format!("rc-device-{alias}"));
 
         let openssh = key
             .to_openssh(LineEnding::LF)
@@ -136,7 +136,7 @@ impl KeyStore for FileKeyStore {
             .load_key(alias)?
             .ok_or_else(|| EngineError::NotFound(format!("device key {alias}")))?;
         let sig = key
-            .sign("helm", HashAlg::Sha256, data)
+            .sign("rcoder", HashAlg::Sha256, data)
             .map_err(|e| EngineError::Parse(format!("sign: {e}")))?;
         let pem = sig
             .to_pem(LineEnding::LF)
@@ -160,7 +160,7 @@ mod tests {
     use super::*;
 
     fn store(name: &str) -> FileKeyStore {
-        let dir = std::env::temp_dir().join(format!("helm-ks-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rc-ks-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         FileKeyStore::new(dir).unwrap()
     }

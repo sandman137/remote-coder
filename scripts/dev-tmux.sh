@@ -4,16 +4,16 @@
 # flows point at (DESIGN.md §11 `just fake-session`).
 #
 # Env overrides:
-#   HELM_SESSION      session name           (default: agents)
-#   HELM_TMUX_SOCKET  tmux -L socket name    (default: default server)
+#   RC_SESSION      session name           (default: agents)
+#   RC_TMUX_SOCKET  tmux -L socket name    (default: default server)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SESSION="${HELM_SESSION:-agents}"
+SESSION="${RC_SESSION:-agents}"
 
 TMUX=(tmux)
-if [[ -n "${HELM_TMUX_SOCKET:-}" ]]; then
-  TMUX=(tmux -L "$HELM_TMUX_SOCKET")
+if [[ -n "${RC_TMUX_SOCKET:-}" ]]; then
+  TMUX=(tmux -L "$RC_TMUX_SOCKET")
 fi
 
 if "${TMUX[@]}" has-session -t "=$SESSION" 2>/dev/null; then

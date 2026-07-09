@@ -1,5 +1,5 @@
-//! Host-side `helm pair` / `helm revoke` / `helm devices` and the client
-//! `helm enroll` dev command (DESIGN.md §8.3).
+//! Host-side `rcoder pair` / `rcoder revoke` / `rcoder devices` and the client
+//! `rcoder enroll` dev command (DESIGN.md §8.3).
 
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -74,7 +74,7 @@ pub fn pair(
     };
     let json = serde_json::to_string(&payload)?;
 
-    // QR for the phone; JSON for the desktop `helm enroll` dev flow.
+    // QR for the phone; JSON for the desktop `rcoder enroll` dev flow.
     let code = qrcode::QrCode::new(json.as_bytes()).context("QR encode")?;
     let art = code
         .render::<qrcode::render::unicode::Dense1x2>()
@@ -82,8 +82,8 @@ pub fn pair(
         .light_color(qrcode::render::unicode::Dense1x2::Dark)
         .build();
     println!("{art}\n");
-    println!("Scan with the HELM app, or on another machine:\n");
-    println!("  helm enroll --device <name> --json '{json}'\n");
+    println!("Scan with the Remote Coder app, or on another machine:\n");
+    println!("  rcoder enroll --device <name> --json '{json}'\n");
     println!(
         "Waiting for one device on :{enroll_port} (token valid {ttl_secs}s, Ctrl-C to abort)…"
     );
@@ -102,13 +102,13 @@ pub fn pair(
         "✔ enrolled device {device:?} in {}",
         authorized_keys.display()
     );
-    println!("  revoke anytime with: helm revoke {device}");
+    println!("  revoke anytime with: rcoder revoke {device}");
     Ok(())
 }
 
 pub async fn enroll_cmd(json: String, device: String, keys_dir: Option<PathBuf>) -> Result<()> {
     let payload: PairPayload = serde_json::from_str(json.trim())
-        .context("parse pairing payload JSON (from `helm pair`)")?;
+        .context("parse pairing payload JSON (from `rcoder pair`)")?;
     let dir = match keys_dir {
         Some(d) => d,
         None => FileKeyStore::default_dir().context("cannot determine key dir")?,
@@ -123,7 +123,7 @@ pub async fn enroll_cmd(json: String, device: String, keys_dir: Option<PathBuf>)
     );
     println!("\nConnect with:");
     println!(
-        "  helm --transport ssh --host {} --port {} --user {} --key {} --hostkey-fp '{}' tui",
+        "  rcoder --transport ssh --host {} --port {} --user {} --key {} --hostkey-fp '{}' tui",
         params.host, params.port, params.user, params.key_path, payload.hostkey_fp
     );
     Ok(())

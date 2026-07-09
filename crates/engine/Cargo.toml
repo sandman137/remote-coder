@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "HELM core engine: transport, tmux protocol, VT grid, agent adapters, attention"
+description = "Remote Coder core engine: transport, tmux protocol, VT grid, agent adapters, attention"
 
 [dependencies]
 tokio = { workspace = true }

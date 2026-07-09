@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HELM"
+rootProject.name = "Remote Coder"
 include(":app")

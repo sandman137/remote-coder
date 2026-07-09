@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "HELM desktop harness: ratatui TUI + headless CLI driving the engine"
+description = "Remote Coder desktop harness: ratatui TUI + headless CLI driving the engine"
 
 [[bin]]
-name = "helm"
+name = "rcoder"
 path = "src/main.rs"
 
 [dependencies]

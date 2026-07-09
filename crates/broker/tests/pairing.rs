@@ -11,7 +11,7 @@ use engine::security::pairing::{enroll, PairPayload};
 use engine::{FileKeyStore, KeyStore};
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("helm-pair-{name}-{}", std::process::id()))
+    std::env::temp_dir().join(format!("rc-pair-{name}-{}", std::process::id()))
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -34,7 +34,7 @@ async fn pairing_round_trip_and_revocation() {
             &host_token,
             Duration::from_secs(20),
             &host_ak,
-            "/opt/helm/broker --session agents",
+            "/opt/rcoder/broker --session agents",
         )
     });
 
@@ -57,11 +57,11 @@ async fn pairing_round_trip_and_revocation() {
 
     // authorized_keys carries the forced command + restrictions + our key.
     let content = std::fs::read_to_string(&authorized_keys).unwrap();
-    assert!(content.contains("command=\"/opt/helm/broker --session agents\""));
+    assert!(content.contains("command=\"/opt/rcoder/broker --session agents\""));
     assert!(content.contains("no-pty"));
     let key_material = pubkey.split_whitespace().nth(1).unwrap();
     assert!(content.contains(key_material));
-    assert!(content.trim_end().ends_with("helm:pixel8"));
+    assert!(content.trim_end().ends_with("rcoder:pixel8"));
 
     // Host key pinned on the device.
     assert_eq!(
@@ -72,7 +72,7 @@ async fn pairing_round_trip_and_revocation() {
     // Revocation removes the device line.
     assert!(broker::enroll::revoke(&authorized_keys, "pixel8").unwrap());
     let content = std::fs::read_to_string(&authorized_keys).unwrap();
-    assert!(!content.contains("helm:pixel8"));
+    assert!(!content.contains("rcoder:pixel8"));
 
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -96,7 +96,7 @@ async fn bad_token_is_rejected_and_does_not_consume() {
             &host_token,
             Duration::from_secs(20),
             &host_ak,
-            "/opt/helm/broker",
+            "/opt/rcoder/broker",
         )
     });
 
@@ -117,7 +117,7 @@ async fn bad_token_is_rejected_and_does_not_consume() {
     assert!(err.to_string().contains("bad token"), "{err}");
     assert!(!std::fs::read_to_string(&authorized_keys)
         .unwrap_or_default()
-        .contains("helm:mallory"));
+        .contains("rcoder:mallory"));
     assert_eq!(keystore.pinned_hostkey("127.0.0.1").unwrap(), None);
 
     // The token wasn't consumed: the real device still enrolls.
@@ -126,7 +126,7 @@ async fn bad_token_is_rejected_and_does_not_consume() {
     assert_eq!(server.join().unwrap().unwrap(), "pixel8");
     assert!(std::fs::read_to_string(&authorized_keys)
         .unwrap()
-        .contains("helm:pixel8"));
+        .contains("rcoder:pixel8"));
 
     std::fs::remove_dir_all(&dir).ok();
 }

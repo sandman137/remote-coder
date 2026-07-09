@@ -1,4 +1,4 @@
-package com.helm.notify
+package com.remotecoder.notify
 
 import android.app.PendingIntent
 import android.content.Intent
@@ -7,9 +7,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.helm.HelmApp
-import com.helm.MainActivity
-import com.helm.R
+import com.remotecoder.RemoteCoderApp
+import com.remotecoder.MainActivity
+import com.remotecoder.R
 
 /**
  * Receives the privacy-filtered pushes from the host notifier (DESIGN.md §8.5)
@@ -22,7 +22,7 @@ class FcmService : FirebaseMessagingService() {
         // Registration: the token is delivered to the host out-of-band during
         // pairing (or via a later authenticated call over the secure channel).
         // Persisted for the pairing/registration flow to pick up.
-        getSharedPreferences("helm", MODE_PRIVATE).edit()
+        getSharedPreferences("rcoder", MODE_PRIVATE).edit()
             .putString("fcm_token", token).apply()
     }
 
@@ -33,7 +33,7 @@ class FcmService : FirebaseMessagingService() {
         val state = d["state"] ?: "waiting"
         val agent = d["agent"] ?: "agent"
 
-        val deepLink = Uri.parse("helm://pane/$session/$pane")
+        val deepLink = Uri.parse("remotecoder://pane/$session/$pane")
         val tap = PendingIntent.getActivity(
             this,
             pane.hashCode(),
@@ -46,10 +46,10 @@ class FcmService : FirebaseMessagingService() {
             "error" -> "$agent errored"
             else -> "$agent needs input"
         }
-        val notif = NotificationCompat.Builder(this, HelmApp.CHANNEL_ATTENTION)
+        val notif = NotificationCompat.Builder(this, RemoteCoderApp.CHANNEL_ATTENTION)
             .setContentTitle(title)
             .setContentText("$session · $pane")
-            .setSmallIcon(R.drawable.ic_stat_helm)
+            .setSmallIcon(R.drawable.ic_stat_rocket)
             .setAutoCancel(true)
             .setContentIntent(tap)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -4,12 +4,12 @@
 // (scripts/run-ffi-test.sh); this file keeps the Kotlin path honest and
 // ready for any host that has the JVM/Kotlin toolchain:
 //
-//   kotlinc -cp jna.jar helm_engine.kt FfiDriver.kt -include-runtime -d ffi.jar
+//   kotlinc -cp jna.jar remotecoder_engine.kt FfiDriver.kt -include-runtime -d ffi.jar
 //   java -Djna.library.path=target/debug -cp ffi.jar:jna.jar FfiDriverKt <socket>
 //
 // It mirrors ffi_driver.py step for step.
 
-import uniffi.helm_engine.*
+import uniffi.remotecoder_engine.*
 
 fun rowText(grid: GridSnapshotFfi, row: Int): String {
     val start = row * grid.cols.toInt()
@@ -24,7 +24,7 @@ fun rowText(grid: GridSnapshotFfi, row: Int): String {
 fun gridText(grid: GridSnapshotFfi): String =
     (0 until grid.rows.toInt()).joinToString("\n") { rowText(grid, it) }
 
-fun waitSnapshot(engine: HelmEngine, pane: String, needle: String, timeoutMs: Long = 15000): GridSnapshotFfi {
+fun waitSnapshot(engine: RemoteCoderEngine, pane: String, needle: String, timeoutMs: Long = 15000): GridSnapshotFfi {
     val deadline = System.currentTimeMillis() + timeoutMs
     var last = ""
     while (System.currentTimeMillis() < deadline) {
@@ -57,7 +57,7 @@ fun main(argv: Array<String>) {
     sh("tmux", "-L", socket, "-f", "/dev/null", "new-session", "-d", "-s", "agents",
        "-x", "90", "-y", "28", "$fixtures/fake-yn.sh")
     try {
-        val engine = HelmEngine.connect(ConnConfigFfi.Local(socket))
+        val engine = RemoteCoderEngine.connect(ConnConfigFfi.Local(socket))
         val listener = CollectingListener()
         engine.setListener(listener)
 

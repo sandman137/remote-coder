@@ -13,7 +13,7 @@ use engine::{ConnConfig, Engine, EngineEvent, PaneId, SshParams};
 const SSHD_BIN: &str = "/usr/sbin/sshd";
 
 fn enabled() -> bool {
-    if std::env::var_os("HELM_SKIP_SSH_TESTS").is_some() {
+    if std::env::var_os("RC_SKIP_SSH_TESTS").is_some() {
         return false;
     }
     Path::new(SSHD_BIN).exists()
@@ -64,9 +64,9 @@ struct BrokeredSsh {
 
 impl BrokeredSsh {
     fn start(hint: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("helm-brk-{hint}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rc-brk-{hint}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let tmux_socket = format!("helm-brk-{hint}-{}", std::process::id());
+        let tmux_socket = format!("rc-brk-{hint}-{}", std::process::id());
         let port = TcpListener::bind("127.0.0.1:0")
             .unwrap()
             .local_addr()
