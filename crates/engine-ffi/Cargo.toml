@@ -10,5 +10,12 @@ description = "UniFFI wrapper around the HELM engine -> libhelm_engine.so + Kotl
 name = "helm_engine"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+
 [dependencies]
 engine = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+uniffi = { version = "0.29", features = ["cli"] }

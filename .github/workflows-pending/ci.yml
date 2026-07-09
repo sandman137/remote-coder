@@ -30,13 +30,38 @@ jobs:
 
   portability:
     # DESIGN.md §13: build the core for an Android target every run so a
-    # Linux-only dependency can't sneak in. `cargo check` needs no NDK.
+    # Linux-only dependency can't sneak into the engine or engine-ffi. russh
+    # uses the `ring` crypto backend, whose C/asm needs the NDK toolchain
+    # (the same one Phase 9's cargo-ndk build uses), so the guard installs
+    # the NDK and drives the check through cargo-ndk.
     name: Android-target portability guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned toolchain + android target
         run: rustup show
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
       - uses: Swatinem/rust-cache@v2
-      - name: Check engine + engine-ffi for aarch64-linux-android
-        run: cargo check -p engine -p engine-ffi --target aarch64-linux-android
+      - name: Check engine + engine-ffi for arm64-v8a
+        run: cargo ndk -t arm64-v8a check -p engine -p engine-ffi
+
+  ffi:
+    # Prove the FFI boundary on Linux (§10.1 layer 5) and keep iOS honest by
+    # generating Swift bindings every run (§12 Phase 8).
+    name: FFI bindings + Python driver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
+      - name: Install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Generate bindings (python + kotlin + swift)
+        run: scripts/build-desktop-ffi.sh
+      - name: Drive the engine across the FFI boundary (Python)
+        run: scripts/run-ffi-test.sh

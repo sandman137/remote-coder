@@ -46,13 +46,21 @@ golden:
 record-fixture NAME:
     scripts/record-fixture.sh {{NAME}}
 
-# portability guard: engine must build for Android targets (no NDK needed for check)
+# portability guard: the core must cross-compile to Android (DESIGN.md §13).
+# Needs the NDK for russh's `ring` crypto backend — set ANDROID_NDK_HOME and
+# use cargo-ndk (same toolchain as the Phase-9 build).
 check-android:
-    cargo check -p engine -p engine-ffi --target aarch64-linux-android
+    cargo ndk -t arm64-v8a check -p engine -p engine-ffi
 
-# build desktop .so + run Kotlin FFI test on the JVM — no emulator (Phase 8)
+# generate bindings (python/kotlin/swift) from the desktop .so (Phase 8)
+ffi-bindings:
+    scripts/build-desktop-ffi.sh
+
+# build desktop .so + drive the engine across the FFI boundary — no emulator
+# (Phase 8). Python (ctypes) bindings are the runnable on-Linux proof of the
+# same FFI surface Android's Kotlin bindings expose.
 ffi-jvm:
-    scripts/build-desktop-ffi.sh && ./gradlew -p crates/engine-ffi/jvm-test test
+    scripts/run-ffi-test.sh
 
 # --- Android (Phase 9 only) ---
 

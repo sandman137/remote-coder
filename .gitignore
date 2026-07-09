@@ -1,7 +1,8 @@
 # Rust
 /target
 
-# Dev-state created by scripts/ (loopback sshd keys, ntfy cache, …)
+# Dev-state created by scripts/ (loopback sshd keys, ntfy cache, generated
+# FFI bindings, …)
 /.dev/
 
 # Editors
