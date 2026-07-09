@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Build & test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace --all-targets
+      - name: Test
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Format
+        run: cargo fmt --all --check
+
+  portability:
+    # DESIGN.md §13: build the core for an Android target every run so a
+    # Linux-only dependency can't sneak in. `cargo check` needs no NDK.
+    name: Android-target portability guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain + android target
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Check engine + engine-ffi for aarch64-linux-android
+        run: cargo check -p engine -p engine-ffi --target aarch64-linux-android

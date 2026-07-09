@@ -1,0 +1,18 @@
+[package]
+name = "engine-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "HELM desktop harness: ratatui TUI + headless CLI driving the engine"
+
+[[bin]]
+name = "helm"
+path = "src/main.rs"
+
+[dependencies]
+engine = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -1,0 +1,7 @@
+# Pinned toolchain for reproducible builds (DESIGN.md §2 "version discipline").
+# The aarch64-linux-android target backs the CI portability guard (§13):
+# `cargo check --target aarch64-linux-android -p engine` needs no NDK (no linking).
+[toolchain]
+channel = "1.93.1"
+components = ["rustfmt", "clippy"]
+targets = ["aarch64-linux-android"]

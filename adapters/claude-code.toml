@@ -1,0 +1,47 @@
+# Claude Code adapter (DESIGN.md §6). Semantic sugar only — launch, attention
+# patterns, quick-action buttons, metadata. The mechanical layer needs none of this.
+id   = "claude-code"
+name = "Claude Code"
+
+launch = { cmd = "claude", args = [], cwd = "picker" }
+
+# Tier-3 attention: matched against recent pane text.
+attention = [
+  'Do you want to proceed\?',
+  'Do you want to make this edit',
+  'Do you want to run this command',
+  '\(y/n\)',
+  '❯\s*1\.\s*Yes',
+  'Waiting for your input',
+]
+
+# Buttons: literal keys, with <Name> tokens for tmux special keys.
+[[buttons]]
+label = "Yes"
+keys  = "1"
+
+[[buttons]]
+label = "Yes, always"
+keys  = "2"
+
+[[buttons]]
+label = "No"
+keys  = "<Escape>"
+
+[[buttons]]
+label = "Enter"
+keys  = "<Enter>"
+
+# Metadata extractors: field <- first capture group.
+[[metadata]]
+field = "tool"
+regex = '●\s+(\w+)'
+
+[[metadata]]
+field = "tokens"
+regex = '(\d+) tokens'
+
+# Tier-1: Claude Code Notification/PreToolUse hooks call the notifier (Phase 7).
+hook = "claude-code-hook.sh"
+
+transport = "tmux"

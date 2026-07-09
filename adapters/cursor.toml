@@ -1,0 +1,35 @@
+# Cursor CLI adapter (DESIGN.md §6.1). Cursor also speaks ACP; transport stays
+# "tmux" until AdapterTransport::Acp is implemented (§6.4 — reserved, not built).
+id   = "cursor"
+name = "Cursor CLI"
+
+launch = { cmd = "agent", args = [], cwd = "picker" }
+
+attention = [
+  '\(y/n\)',
+  'Apply this edit\?',
+  'Run command\?',
+]
+
+[[buttons]]
+label = "Yes"
+keys  = "y\n"
+
+[[buttons]]
+label = "No"
+keys  = "n\n"
+
+[[buttons]]
+label = "Always"
+keys  = "a\n"
+
+[[metadata]]
+field = "cost"
+regex = 'tokens:\s*(\d+)'
+
+[[metadata]]
+field = "tool"
+regex = '●\s*(\w+)'
+
+hook = ""
+transport = "tmux"

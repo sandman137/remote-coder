@@ -1,0 +1,31 @@
+# OpenAI Codex CLI adapter (DESIGN.md §6).
+id   = "codex"
+name = "Codex CLI"
+
+launch = { cmd = "codex", args = [], cwd = "picker" }
+
+attention = [
+  'Allow command\?',
+  'Approve\?',
+  '\(y/n\)',
+  'press enter to continue',
+]
+
+[[buttons]]
+label = "Yes"
+keys  = "y"
+
+[[buttons]]
+label = "No"
+keys  = "n"
+
+[[buttons]]
+label = "Enter"
+keys  = "<Enter>"
+
+[[metadata]]
+field = "tokens"
+regex = 'tokens used:\s*(\d+)'
+
+hook = ""
+transport = "tmux"

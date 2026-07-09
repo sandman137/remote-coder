@@ -1,0 +1,20 @@
+# Rust
+/target
+
+# Dev-state created by scripts/ (loopback sshd keys, ntfy cache, …)
+/.dev/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Android (Phase 9)
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/app/src/main/jniLibs/
+
+# Misc
+*.log

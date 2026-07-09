@@ -1,0 +1,9 @@
+[package]
+name = "broker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "HELM SSH forced-command broker: whitelists tmux subcommands, scopes to the agents session"
+
+[dependencies]
