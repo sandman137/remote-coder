@@ -5,11 +5,10 @@
 //!   helm --transport local snapshot agents:0.0 --scrollback 200 --ansi
 //!   helm --transport local send agents:0.0 'y<Enter>'
 
-mod render;
-
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use engine::{ConnConfig, Engine, PaneId};
+use engine_cli::{render, tui};
 
 #[derive(Parser)]
 #[command(name = "helm", version, about = "tmux agent remote — desktop harness")]
@@ -151,7 +150,7 @@ async fn main() -> Result<()> {
             engine.send_key_string(&pane, keys).await?;
         }
         Cmd::Tui => {
-            bail!("the ratatui TUI lands in Phase 2");
+            tui::run_tui(engine, cli.session.clone()).await?;
         }
     }
     Ok(())
