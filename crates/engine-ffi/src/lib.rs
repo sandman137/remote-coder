@@ -19,18 +19,20 @@ use tokio::runtime::Runtime;
 
 uniffi::setup_scaffolding!();
 
+// Field is `reason`, not `message`: UniFFI maps error variants to Kotlin
+// exceptions, and a `message` field collides with Throwable.message.
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FfiError {
-    #[error("engine error: {message}")]
-    Engine { message: String },
-    #[error("runtime error: {message}")]
-    Runtime { message: String },
+    #[error("engine error: {reason}")]
+    Engine { reason: String },
+    #[error("runtime error: {reason}")]
+    Runtime { reason: String },
 }
 
 impl From<engine::EngineError> for FfiError {
     fn from(e: engine::EngineError) -> Self {
         FfiError::Engine {
-            message: e.to_string(),
+            reason: e.to_string(),
         }
     }
 }
@@ -63,7 +65,7 @@ impl HelmEngine {
             .enable_all()
             .build()
             .map_err(|e| FfiError::Runtime {
-                message: e.to_string(),
+                reason: e.to_string(),
             })?;
 
         let conn = match config {
@@ -238,7 +240,7 @@ pub fn pair_enroll(
 
     let payload: PairPayload =
         serde_json_from_str(&payload_json).map_err(|e| FfiError::Engine {
-            message: format!("parse pairing payload: {e}"),
+            reason: format!("parse pairing payload: {e}"),
         })?;
     let keystore = FileKeyStore::new(keys_dir).map_err(FfiError::from)?;
 
@@ -247,7 +249,7 @@ pub fn pair_enroll(
         .enable_all()
         .build()
         .map_err(|e| FfiError::Runtime {
-            message: e.to_string(),
+            reason: e.to_string(),
         })?;
     rt.block_on(enroll(&payload, &keystore, &device))
         .map_err(FfiError::from)?;

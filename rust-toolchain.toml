@@ -4,4 +4,5 @@
 [toolchain]
 channel = "1.93.1"
 components = ["rustfmt", "clippy"]
-targets = ["aarch64-linux-android"]
+# arm64 for real devices; x86_64 for the emulator (Phase 9 build via cargo-ndk).
+targets = ["aarch64-linux-android", "x86_64-linux-android"]

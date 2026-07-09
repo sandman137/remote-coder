@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -49,10 +48,10 @@ fun PaneListScreen(
             items(panes, key = { it.id }) { pane ->
                 val waiting = pane.id in attention
                 Card(
-                    Modifier
+                    onClick = { onOpen(pane) },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp),
-                    onClick = { onOpen(pane) },
                 ) {
                     Row(
                         Modifier.padding(16.dp).fillMaxWidth(),
