@@ -30,6 +30,10 @@ pub struct Engine {
     /// One control-mode streamer per attached session (Phase 3).
     streamers: tokio::sync::Mutex<HashMap<String, StreamHandle>>,
     registry: Arc<Registry>,
+    /// pane id → (session, current_command), fed by every scoped
+    /// enumeration. Behind the broker, `list-panes -a` is denied (§8.2), so
+    /// `%id`-only lookups must resolve from what scoped listings taught us.
+    pane_cache: std::sync::Mutex<HashMap<String, (String, String)>>,
 }
 
 impl Engine {
@@ -52,6 +56,7 @@ impl Engine {
             events: EventBus::new(),
             streamers: tokio::sync::Mutex::new(HashMap::new()),
             registry: Arc::new(registry),
+            pane_cache: std::sync::Mutex::new(HashMap::new()),
         })
     }
 
@@ -83,7 +88,19 @@ impl Engine {
     /// Panes of one session (windows flattened — the UI groups by window).
     pub async fn list_panes(&self, session: &str) -> Result<Vec<PaneInfo>> {
         let out = self.transport.exec(&cmd::list_panes(Some(session))).await?;
-        parse_panes(&out)
+        let panes = parse_panes(&out)?;
+        self.remember_panes(&panes);
+        Ok(panes)
+    }
+
+    fn remember_panes(&self, panes: &[PaneInfo]) {
+        let mut cache = self.pane_cache.lock().expect("pane cache");
+        for p in panes {
+            cache.insert(
+                p.id.0.clone(),
+                (p.session.clone(), p.current_command.clone()),
+            );
+        }
     }
 
     /// Render a pane via `capture-pane` (snapshot mode). `scrollback` = how
@@ -204,8 +221,9 @@ impl Engine {
     /// The adapter driving a pane, if detectable: by foreground command
     /// first, then by prompt patterns in the visible text (§6.2).
     pub async fn adapter_for_pane(&self, pane: &PaneId) -> Result<Option<AgentAdapter>> {
-        let out = self.transport.exec(&cmd::list_panes(None)).await?;
-        let panes = parse_panes(&out)?;
+        // Scoped enumeration (broker-safe) — resolve the session first.
+        let session = self.resolve_session(pane).await?;
+        let panes = self.list_panes(&session).await?;
         let Some(info) = panes.iter().find(|p| {
             p.id == *pane || format!("{}:{}.{}", p.session, p.window_index, p.pane_index) == pane.0
         }) else {
@@ -270,13 +288,26 @@ impl Engine {
     }
 
     /// Which session a pane belongs to. `sess:win.pane` targets parse
-    /// directly; `%id` panes are looked up across all sessions.
+    /// directly; `%id` panes resolve from the enumeration cache, falling
+    /// back to a cross-session listing (denied behind the broker, in which
+    /// case the caller should have enumerated the scoped session first).
     async fn resolve_session(&self, pane: &PaneId) -> Result<String> {
         if let Some((session, _)) = pane.0.split_once(':') {
             return Ok(session.trim_start_matches('=').to_string());
         }
+        if let Some((session, _)) = self
+            .pane_cache
+            .lock()
+            .expect("pane cache")
+            .get(&pane.0)
+            .cloned()
+        {
+            return Ok(session);
+        }
         let out = self.transport.exec(&cmd::list_panes(None)).await?;
-        parse_panes(&out)?
+        let panes = parse_panes(&out)?;
+        self.remember_panes(&panes);
+        panes
             .into_iter()
             .find(|p| p.id == *pane)
             .map(|p| p.session)

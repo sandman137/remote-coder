@@ -68,6 +68,55 @@ enum Cmd {
     Send { target: String, keys: String },
     /// Interactive TUI (Phase 2)
     Tui,
+    /// Host-side: show a pairing QR and enroll one device (§8.3)
+    Pair {
+        /// Address devices should connect to (e.g. the tailnet IP)
+        #[arg(long)]
+        pair_host: String,
+        /// sshd port devices will use
+        #[arg(long, default_value_t = 22)]
+        ssh_port: u16,
+        /// authorized_keys to append to (default ~/.ssh/authorized_keys)
+        #[arg(long)]
+        authorized_keys: Option<std::path::PathBuf>,
+        /// Installed broker path written into the forced command
+        #[arg(long, default_value = "/opt/helm/broker")]
+        broker_path: String,
+        /// Session prefix the broker scopes to
+        #[arg(long, default_value = "agents")]
+        scope_session: String,
+        /// Enroll listener port
+        #[arg(long, default_value_t = 7766)]
+        enroll_port: u16,
+        /// Token lifetime in seconds
+        #[arg(long, default_value_t = 600)]
+        ttl: u64,
+        /// Host public key file for the pinned fingerprint
+        #[arg(long)]
+        hostkey_pub: Option<std::path::PathBuf>,
+    },
+    /// Client-side: enroll this machine using the JSON from `helm pair`
+    Enroll {
+        #[arg(long)]
+        json: String,
+        /// Device name to enroll as
+        #[arg(long, default_value = "desktop")]
+        device: String,
+        /// Key directory (default $XDG_CONFIG_HOME/helm/keys)
+        #[arg(long)]
+        keys_dir: Option<std::path::PathBuf>,
+    },
+    /// Host-side: revoke a paired device
+    Revoke {
+        device: String,
+        #[arg(long)]
+        authorized_keys: Option<std::path::PathBuf>,
+    },
+    /// Host-side: list paired devices
+    Devices {
+        #[arg(long)]
+        authorized_keys: Option<std::path::PathBuf>,
+    },
 }
 
 fn conn_config(cli: &Cli) -> Result<ConnConfig> {
@@ -112,6 +161,53 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
+
+    // Pairing/device management doesn't need (or want) a tmux connection.
+    match &cli.cmd {
+        Cmd::Pair {
+            pair_host,
+            ssh_port,
+            authorized_keys,
+            broker_path,
+            scope_session,
+            enroll_port,
+            ttl,
+            hostkey_pub,
+        } => {
+            return engine_cli::pairing_cmd::pair(
+                pair_host.clone(),
+                *ssh_port,
+                cli.user.clone(),
+                authorized_keys.clone(),
+                broker_path.clone(),
+                scope_session.clone(),
+                *enroll_port,
+                *ttl,
+                hostkey_pub.clone(),
+            );
+        }
+        Cmd::Enroll {
+            json,
+            device,
+            keys_dir,
+        } => {
+            return engine_cli::pairing_cmd::enroll_cmd(
+                json.clone(),
+                device.clone(),
+                keys_dir.clone(),
+            )
+            .await;
+        }
+        Cmd::Revoke {
+            device,
+            authorized_keys,
+        } => return engine_cli::pairing_cmd::revoke(device.clone(), authorized_keys.clone()),
+        Cmd::Devices { authorized_keys } => {
+            return engine_cli::pairing_cmd::devices(authorized_keys.clone())
+        }
+        _ => {}
+    }
+
     let engine = Engine::connect(conn_config(&cli)?).await?;
 
     match &cli.cmd {
@@ -129,22 +225,29 @@ async fn main() -> Result<()> {
                     s.attached,
                     if s.attached == 1 { "" } else { "s" }
                 );
-                for p in engine.list_panes(&s.name).await? {
-                    println!(
-                        "  {}:{}.{}  {}  [{}x{}]  {}{}",
-                        p.session,
-                        p.window_index,
-                        p.pane_index,
-                        p.id,
-                        p.width,
-                        p.height,
-                        p.current_command,
-                        if p.active && p.window_active {
-                            "  (active)"
-                        } else {
-                            ""
+                // Behind the broker, sessions outside the scope list by name
+                // only — their panes are denied host-side (§8.2).
+                match engine.list_panes(&s.name).await {
+                    Ok(panes) => {
+                        for p in panes {
+                            println!(
+                                "  {}:{}.{}  {}  [{}x{}]  {}{}",
+                                p.session,
+                                p.window_index,
+                                p.pane_index,
+                                p.id,
+                                p.width,
+                                p.height,
+                                p.current_command,
+                                if p.active && p.window_active {
+                                    "  (active)"
+                                } else {
+                                    ""
+                                }
+                            );
                         }
-                    );
+                    }
+                    Err(e) => println!("  (panes unavailable: {e})"),
                 }
             }
         }
@@ -167,6 +270,10 @@ async fn main() -> Result<()> {
         }
         Cmd::Tui => {
             tui::run_tui(engine, cli.session.clone()).await?;
+        }
+        // Handled before the engine connects.
+        Cmd::Pair { .. } | Cmd::Enroll { .. } | Cmd::Revoke { .. } | Cmd::Devices { .. } => {
+            unreachable!("pairing commands return early")
         }
     }
     Ok(())
