@@ -85,6 +85,17 @@ impl Engine {
         }
     }
 
+    /// Clients attached to a session (control-mode clients are engines like
+    /// this one, not humans — the notifier keys off that distinction).
+    pub async fn list_clients(&self, session: &str) -> Result<Vec<crate::tmux::ClientInfo>> {
+        match self.transport.exec(&cmd::list_clients(session)).await {
+            Ok(out) => crate::tmux::parse_clients(&out),
+            // No such session / no server: nobody is attached.
+            Err(TransportError::Tmux { .. }) => Ok(Vec::new()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     /// Panes of one session (windows flattened — the UI groups by window).
     pub async fn list_panes(&self, session: &str) -> Result<Vec<PaneInfo>> {
         let out = self.transport.exec(&cmd::list_panes(Some(session))).await?;

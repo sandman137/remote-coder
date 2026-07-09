@@ -64,6 +64,14 @@ pub struct PaneInfo {
     pub height: u16,
 }
 
+/// A client attached to a session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientInfo {
+    pub name: String,
+    /// True for `tmux -C` control clients (engines, not humans).
+    pub control_mode: bool,
+}
+
 /// Size + cursor of a single pane, fetched alongside snapshots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PaneGeometry {
@@ -134,6 +142,16 @@ pub mod cmd {
         argv.push("-F".into());
         argv.push(pane_format());
         argv
+    }
+
+    pub fn list_clients(session: &str) -> Vec<String> {
+        vec![
+            "list-clients".into(),
+            "-t".into(),
+            format!("={session}"),
+            "-F".into(),
+            ["#{client_name}", "#{client_control_mode}"].join(&SEP.to_string()),
+        ]
     }
 
     pub fn display_geometry(pane: &PaneId) -> Vec<String> {
@@ -316,6 +334,22 @@ pub fn parse_panes(stdout: &[u8]) -> Result<Vec<PaneInfo>, EngineError> {
             active: f[8] == "1",
             width: f[9].parse().map_err(|_| parse_err("pane", line))?,
             height: f[10].parse().map_err(|_| parse_err("pane", line))?,
+        });
+    }
+    Ok(out)
+}
+
+pub fn parse_clients(stdout: &[u8]) -> Result<Vec<ClientInfo>, EngineError> {
+    let text = String::from_utf8_lossy(stdout);
+    let mut out = Vec::new();
+    for line in text.lines().filter(|l| !l.is_empty()) {
+        let f = split_fields(line);
+        if f.len() != 2 {
+            return Err(parse_err("client", line));
+        }
+        out.push(ClientInfo {
+            name: f[0].to_string(),
+            control_mode: f[1] == "1",
         });
     }
     Ok(out)

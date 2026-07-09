@@ -7,5 +7,13 @@ repository.workspace = true
 description = "HELM host-side notify daemon: tiered attention -> privacy-filtered push (ntfy/FCM/APNs)"
 
 [dependencies]
+engine = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
