@@ -23,10 +23,32 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            // Supplied via -PrcStoreFile=… (gitignored keystore). Falls back
+            // to the debug key when absent so plain assembleRelease still works.
+            val storeFilePath = project.findProperty("rcStoreFile") as String?
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+                storePassword = project.property("rcStorePassword") as String
+                keyAlias = project.property("rcKeyAlias") as String
+                keyPassword = project.property("rcKeyPassword") as String
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
+            // -PreleaseDebuggable flips only the debuggable flag (R8 output is
+            // unchanged) so the deep-link test path can exercise the FFI/SSH
+            // stack on the minified build. The shipped APK is built without it.
+            isDebuggable = project.hasProperty("releaseDebuggable")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig =
+                if (project.hasProperty("rcStoreFile")) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
         }
     }
 
