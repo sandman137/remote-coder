@@ -208,3 +208,62 @@ impl HelmEngine {
 pub fn engine_version() -> String {
     engine::version().to_string()
 }
+
+/// Ready-to-connect SSH parameters produced by pairing.
+#[derive(uniffi::Record, Debug, Clone)]
+pub struct PairedHostFfi {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub key_path: String,
+    pub hostkey_fp: String,
+}
+
+/// Run the pairing flow (DESIGN.md §8.3) from the QR JSON: generate/reuse the
+/// device key in `keys_dir`, enroll over the one-time token channel, pin the
+/// host key, and return the SSH params to feed `ConnConfigFfi::Ssh`.
+///
+/// `keys_dir` is app-private storage on mobile. Hardware-backed
+/// (StrongBox/biometric) signing is layered by the platform KeyStore; this
+/// file-keystore path is the emulator/dev bring-up (the private key stays in
+/// non-exportable app storage).
+#[uniffi::export]
+pub fn pair_enroll(
+    payload_json: String,
+    device: String,
+    keys_dir: String,
+) -> Result<PairedHostFfi, FfiError> {
+    use engine::security::pairing::{enroll, ssh_params_for, PairPayload};
+    use engine::FileKeyStore;
+
+    let payload: PairPayload =
+        serde_json_from_str(&payload_json).map_err(|e| FfiError::Engine {
+            message: format!("parse pairing payload: {e}"),
+        })?;
+    let keystore = FileKeyStore::new(keys_dir).map_err(FfiError::from)?;
+
+    // A short-lived runtime for the async enroll.
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| FfiError::Runtime {
+            message: e.to_string(),
+        })?;
+    rt.block_on(enroll(&payload, &keystore, &device))
+        .map_err(FfiError::from)?;
+
+    let params = ssh_params_for(&payload, &keystore, &device);
+    Ok(PairedHostFfi {
+        host: params.host,
+        port: params.port,
+        user: params.user,
+        key_path: params.key_path,
+        hostkey_fp: params.hostkey_fp.unwrap_or_default(),
+    })
+}
+
+// Tiny JSON entry indirection so we don't need serde_json as a direct dep of
+// this crate — the engine already parses PairPayload from a &str via serde.
+fn serde_json_from_str(s: &str) -> Result<engine::security::pairing::PairPayload, String> {
+    engine::security::pairing::PairPayload::from_json(s).map_err(|e| e.to_string())
+}

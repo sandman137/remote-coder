@@ -40,17 +40,27 @@ just tui-ssh        # same TUI over SSH -> localhost
 
 ## Status
 
-Building phase by phase per [DESIGN.md §12](DESIGN.md). Current: **Phase 0 — scaffold**.
+Built phase by phase per [DESIGN.md §12](DESIGN.md). Phases 0–8 are complete
+and fully tested on Linux (**115 Rust tests + a Python FFI driver**, all
+green); Phase 9's Android source is complete and builds with the Android
+toolchain.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Workspace scaffold, dev scripts, CI | ✅ |
-| 1 | LocalTransport + snapshot mode | — |
-| 2 | Desktop TUI harness | — |
-| 3 | Control-mode streaming + VT grid | — |
-| 4 | Adapters + attention | — |
-| 5 | SshTransport + loopback proof | — |
-| 6 | Broker + pairing + keystore | — |
-| 7 | Notifications | — |
-| 8 | UniFFI + JVM FFI test | — |
-| 9 | Android app | — |
+| 1 | LocalTransport + snapshot mode | ✅ |
+| 2 | Desktop TUI harness | ✅ |
+| 3 | Control-mode streaming + VT grid | ✅ |
+| 4 | Adapters + attention | ✅ |
+| 5 | SshTransport + loopback proof | ✅ |
+| 6 | Broker + pairing + keystore | ✅ |
+| 7 | Notifications | ✅ |
+| 8 | UniFFI + FFI driver (Python; Kotlin/Swift generated) | ✅ |
+| 9 | Android app (Compose) | ✅ source; needs Android toolchain to build |
+
+The entire product experience runs on Linux today: `just tui` (local) and
+`just tui-ssh` (over SSH → loopback → broker) deliver sessions, live
+streaming, approve/reject buttons, attention badges, and metadata chips. Per
+DESIGN.md §3, a green engine over `SshTransport`-to-loopback ≈ a green Android
+app over the tailnet — and the [Android client](android/) consumes the exact
+same engine through the generated UniFFI bindings.

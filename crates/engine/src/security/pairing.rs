@@ -30,6 +30,17 @@ pub struct PairPayload {
     pub ttl: u64,
 }
 
+impl PairPayload {
+    pub fn from_json(s: &str) -> Result<Self> {
+        serde_json::from_str(s.trim())
+            .map_err(|e| EngineError::Parse(format!("pairing payload: {e}")))
+    }
+
+    pub fn to_json(&self) -> Result<String> {
+        serde_json::to_string(self).map_err(|e| EngineError::Parse(format!("pairing payload: {e}")))
+    }
+}
+
 #[derive(Serialize)]
 struct EnrollRequest<'a> {
     v: u8,
