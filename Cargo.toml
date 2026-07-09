@@ -32,6 +32,10 @@ toml = "0.8"
 
 # Text
 regex = "1"
+unicode-width = "0.2"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
 
 # Internal
 engine = { path = "crates/engine" }
