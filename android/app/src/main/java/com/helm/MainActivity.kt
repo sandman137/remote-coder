@@ -67,15 +67,30 @@ class MainActivity : FragmentActivity() {
 
     private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme == "helm" && data.host == "pane") {
-            // /<session>/<paneId>
-            val segments = data.pathSegments
-            if (segments.size >= 2) {
-                val paneId = segments[1]
-                vm.state.value.panes.firstOrNull { it.id == paneId }?.let(vm::openPane)
+        when (data.host) {
+            "pane" -> {
+                // /<session>/<paneId>
+                val segments = data.pathSegments
+                if (segments.size >= 2) {
+                    val paneId = segments[1]
+                    vm.state.value.panes.firstOrNull { it.id == paneId }?.let(vm::openPane)
+                }
+            }
+            // Debug-only: drive the REAL pairing+connect path with a payload
+            // (the QR scanner can't be automated over adb). Not available in
+            // release builds. `adb shell am start -a android.intent.action.VIEW
+            //   -d helm://connect --es payload '<json>' --es device emu`
+            "connect" -> if (isDebuggable()) {
+                val payload = intent.getStringExtra("payload")
+                    ?: data.getQueryParameter("payload")
+                val device = intent.getStringExtra("device") ?: "emu"
+                if (!payload.isNullOrEmpty()) vm.pairAndConnect(payload, device)
             }
         }
     }
+
+    private fun isDebuggable(): Boolean =
+        applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
 
     private fun deviceName(): String =
         (android.os.Build.MODEL ?: "phone").replace(Regex("[^A-Za-z0-9]"), "-").lowercase()
