@@ -8,6 +8,7 @@
 //! session scope, and execs tmux (argv array — never a shell). Denials log
 //! to stderr and exit 65.
 
+use std::io::{Read, Write};
 use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 
@@ -80,6 +81,37 @@ fn base_command(opts: &Opts) -> Command {
     cmd
 }
 
+/// Receive `size` bytes on stdin and store them under `~/.rcoder/uploads/`
+/// (0700 dir, 0600 file, epoch-prefixed name — never overwrites). Prints the
+/// absolute path on stdout; the client inserts it into the agent's prompt.
+fn receive_upload(name: &str, size: u64) -> Result<std::path::PathBuf, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    let dir = std::path::Path::new(&home).join(".rcoder").join("uploads");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let _ = std::fs::set_permissions(&dir, std::os::unix::fs::PermissionsExt::from_mode(0o700));
+
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("{stamp}-{name}"));
+
+    let mut buf = vec![0u8; size as usize];
+    std::io::stdin()
+        .read_exact(&mut buf)
+        .map_err(|e| format!("short read ({e})"))?;
+
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut f = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    f.write_all(&buf).map_err(|e| e.to_string())?;
+    Ok(path)
+}
+
 /// Self-heal: recreate the scoped session if it died (tmux kills a session
 /// with its last window). A paired phone should land in an empty session and
 /// see "no panes yet" — never a hard connection error.
@@ -120,6 +152,16 @@ fn main() {
             eprintln!("rc-broker: exec tmux failed: {err}");
             std::process::exit(DENY_EXIT);
         }
+        Decision::Upload { name, size } => match receive_upload(&name, size) {
+            Ok(path) => {
+                println!("{}", path.display());
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("rc-broker: upload failed: {e}");
+                std::process::exit(DENY_EXIT);
+            }
+        },
         Decision::Denied(reason) => {
             // Reason only — never echo pane content or key material.
             eprintln!("rc-broker: denied: {reason}");

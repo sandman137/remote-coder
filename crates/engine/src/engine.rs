@@ -162,6 +162,13 @@ impl Engine {
         self.send_keys(pane, &parse_key_string(keys)).await
     }
 
+    /// Store an attachment on the host (broker `upload` over SSH; local
+    /// filesystem otherwise) and return its absolute path for insertion into
+    /// an agent prompt — Claude Code et al. read file/image paths natively.
+    pub async fn upload_attachment(&self, name: &str, data: &[u8]) -> Result<String> {
+        Ok(self.transport.upload(name, data).await?)
+    }
+
     /// Begin streaming a pane: attaches a control-mode client to the pane's
     /// session (shared per session), sets the client size so tmux reflows for
     /// this viewport (§4.3), and marks the pane watched — `EngineEvent::Grid`

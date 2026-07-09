@@ -219,6 +219,57 @@ impl Transport for SshTransport {
             .map_err(|_| TransportError::Timeout("ssh exec"))?
     }
 
+    async fn upload(&self, name: &str, data: &[u8]) -> Result<String, TransportError> {
+        // The broker's `upload <name> <size>` verb: bytes on stdin, absolute
+        // stored path on stdout. Bypasses the tmux prefix on purpose.
+        let cmd = format!("upload {} {}", shell_quote(name), data.len());
+        let run = async {
+            let mut channel = self
+                .handle
+                .channel_open_session()
+                .await
+                .map_err(|e| TransportError::Connect(e.to_string()))?;
+            channel
+                .exec(true, cmd)
+                .await
+                .map_err(|e| TransportError::Connect(e.to_string()))?;
+            channel
+                .data(data)
+                .await
+                .map_err(|e| TransportError::Connect(e.to_string()))?;
+            channel
+                .eof()
+                .await
+                .map_err(|e| TransportError::Connect(e.to_string()))?;
+
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let mut status: Option<u32> = None;
+            while let Some(msg) = channel.wait().await {
+                match msg {
+                    ChannelMsg::Data { data } => stdout.extend_from_slice(&data),
+                    ChannelMsg::ExtendedData { data, ext: 1 } => stderr.extend_from_slice(&data),
+                    ChannelMsg::ExitStatus { exit_status } => status = Some(exit_status),
+                    _ => {}
+                }
+            }
+            match status {
+                Some(0) => Ok(String::from_utf8_lossy(&stdout).trim().to_string()),
+                Some(code) => Err(TransportError::Tmux {
+                    status: code as i32,
+                    stderr: String::from_utf8_lossy(&stderr).trim().to_string(),
+                }),
+                None => Err(TransportError::Protocol(
+                    "ssh upload channel closed without exit status".into(),
+                )),
+            }
+        };
+        // Uploads can be MBs over mobile links — allow well beyond EXEC_TIMEOUT.
+        tokio::time::timeout(std::time::Duration::from_secs(120), run)
+            .await
+            .map_err(|_| TransportError::Timeout("ssh upload"))?
+    }
+
     async fn open_control(
         &self,
         session: &str,

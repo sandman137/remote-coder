@@ -32,11 +32,18 @@ data class UiState(
     val scrollback: UInt = 0u,
     val status: String = "",
     val error: String? = null,
+    /** Host path of a just-uploaded attachment, pending insertion into the input line. */
+    val attachment: String? = null,
 )
 
+// Claude Code's own key vocabulary: Esc interrupts, Shift-Tab (BTab) cycles
+// permission modes, ↑/↓ walk prompt history. Adapter attention events still
+// override these with prompt-specific choices (Yes/No/1/2/…).
 private val defaultButtons = listOf(
-    ButtonFfi("Yes", "y"),
-    ButtonFfi("No", "n"),
+    ButtonFfi("Esc", "<Escape>"),
+    ButtonFfi("Mode", "<BTab>"),
+    ButtonFfi("↑", "<Up>"),
+    ButtonFfi("↓", "<Down>"),
     ButtonFfi("Enter", "<Enter>"),
     ButtonFfi("Ctrl-C", "<C-c>"),
 )
@@ -156,6 +163,38 @@ class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun sendText(text: String) = withPane { pane -> repo.sendText(pane.id, text) }
+
+    /**
+     * Upload a picked file to the host over the broker channel; the stored
+     * path lands in [UiState.attachment] for the input line to absorb —
+     * Claude Code reads file/image paths straight from the prompt.
+     */
+    fun attachFile(uri: android.net.Uri) {
+        val resolver = getApplication<Application>().contentResolver
+        viewModelScope.launch {
+            try {
+                update { copy(status = "uploading attachment…", error = null) }
+                val (name, bytes) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    var display = "attachment"
+                    resolver.query(uri, null, null, null, null)?.use { c ->
+                        val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (i >= 0 && c.moveToFirst()) display = c.getString(i) ?: display
+                    }
+                    val data = resolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IllegalStateException("cannot read $uri")
+                    display to data
+                }
+                require(bytes.size <= 16 * 1024 * 1024) { "attachment exceeds 16 MB" }
+                val path = repo.uploadAttachment(name, bytes)
+                update { copy(status = "", attachment = path) }
+            } catch (e: Exception) {
+                update { copy(status = "", error = "attach failed: ${e.message}") }
+            }
+        }
+    }
+
+    /** The input line has absorbed [UiState.attachment]. */
+    fun consumeAttachment() = update { copy(attachment = null) }
 
     fun scrollBy(delta: Int) {
         val next = (_state.value.scrollback.toLong() + delta).coerceIn(0, 5000).toUInt()

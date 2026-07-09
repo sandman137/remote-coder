@@ -31,12 +31,36 @@ impl<F: Fn(&str) -> Option<String>> PaneResolver for F {
 pub enum Decision {
     /// Exec tmux with exactly this argv (the leading `tmux` word stripped).
     Allowed(Vec<String>),
+    /// Receive exactly `size` bytes on stdin and store them as an attachment
+    /// named `name` (already sanitized) in the uploads dir; print the path.
+    Upload { name: String, size: u64 },
     Denied(String),
 }
 
 impl Decision {
     pub fn allowed(&self) -> bool {
         matches!(self, Decision::Allowed(_))
+    }
+}
+
+/// Attachment uploads: hard size cap (phone photos fit comfortably).
+pub const UPLOAD_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Sanitize an attachment filename: strip any path components, keep only
+/// `[A-Za-z0-9._-]`, forbid dotfiles, cap length. None if nothing safe
+/// remains.
+pub fn sanitize_upload_name(raw: &str) -> Option<String> {
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or(raw);
+    let cleaned: String = base
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        .take(80)
+        .collect();
+    let cleaned = cleaned.trim_start_matches('.').to_string();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
     }
 }
 
@@ -161,6 +185,26 @@ pub fn authorize(original: &str, session: &str, resolver: &dyn PaneResolver) -> 
     };
     if toks.is_empty() {
         return Decision::Denied("empty command (interactive shell request?)".into());
+    }
+    // Attachment upload: `upload <name> <size>` — bytes arrive on stdin.
+    // Handled by the broker itself (never exec'd); §8.2 addendum.
+    if toks[0] == "upload" {
+        if toks.len() != 3 {
+            return Decision::Denied("upload: usage: upload <name> <size>".into());
+        }
+        let Some(name) = sanitize_upload_name(&toks[1]) else {
+            return Decision::Denied(format!("upload: unusable filename {:?}", toks[1]));
+        };
+        let size: u64 = match toks[2].parse() {
+            Ok(n) => n,
+            Err(_) => return Decision::Denied(format!("upload: bad size {:?}", toks[2])),
+        };
+        if size == 0 || size > UPLOAD_MAX_BYTES {
+            return Decision::Denied(format!(
+                "upload: size {size} outside 1..={UPLOAD_MAX_BYTES}"
+            ));
+        }
+        return Decision::Upload { name, size };
     }
     if toks[0] != "tmux" {
         return Decision::Denied(format!("only tmux is brokered, got {:?}", toks[0]));
@@ -567,5 +611,45 @@ mod tests {
         // shell_quote("it's") emits 'it'\''s' — must round-trip.
         assert_eq!(tokenize(r#"'it'\''s'"#).unwrap(), vec!["it's"]);
         assert!(tokenize("unterminated 'quote").is_err());
+    }
+
+    #[test]
+    fn upload_verb_authorizes_and_sanitizes() {
+        let no = |_: &str| -> Option<String> { None };
+        // Happy path.
+        match authorize("upload photo.png 12345", "agents", &no) {
+            Decision::Upload { name, size } => {
+                assert_eq!(name, "photo.png");
+                assert_eq!(size, 12345);
+            }
+            d => panic!("{d:?}"),
+        }
+        // Path components + hostile chars are stripped; dotfiles refused.
+        match authorize("upload '../../etc/passwd' 10", "agents", &no) {
+            Decision::Upload { name, .. } => assert_eq!(name, "passwd"),
+            d => panic!("{d:?}"),
+        }
+        assert!(!authorize("upload '...' 10", "agents", &no).allowed());
+        assert!(matches!(
+            authorize("upload '..' 10", "agents", &no),
+            Decision::Denied(_)
+        ));
+        // Size limits.
+        assert!(matches!(
+            authorize("upload a.png 0", "agents", &no),
+            Decision::Denied(_)
+        ));
+        assert!(matches!(
+            authorize(&format!("upload a.png {}", UPLOAD_MAX_BYTES + 1), "agents", &no),
+            Decision::Denied(_)
+        ));
+        // Arity + non-numeric size.
+        assert!(matches!(authorize("upload a.png", "agents", &no), Decision::Denied(_)));
+        assert!(matches!(
+            authorize("upload a.png ten", "agents", &no),
+            Decision::Denied(_)
+        ));
+        // Anything else non-tmux still denied.
+        assert!(matches!(authorize("scp x y", "agents", &no), Decision::Denied(_)));
     }
 }

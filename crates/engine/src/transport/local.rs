@@ -98,6 +98,10 @@ impl Transport for LocalTransport {
             eof: false,
         }))
     }
+
+    async fn upload(&self, name: &str, data: &[u8]) -> Result<String, TransportError> {
+        super::write_upload_local(name, data)
+    }
 }
 
 struct LocalControlChannel {

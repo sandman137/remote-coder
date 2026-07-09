@@ -32,6 +32,42 @@ pub trait Transport: Send + Sync {
         session: &str,
         size: (u16, u16),
     ) -> Result<Box<dyn ControlChannel>, TransportError>;
+
+    /// Store `data` as an attachment named `name` on the host side and return
+    /// the absolute path (for insertion into an agent prompt). Over SSH this
+    /// is the broker's `upload` verb; locally it writes `~/.rcoder/uploads`.
+    async fn upload(&self, name: &str, data: &[u8]) -> Result<String, TransportError>;
+}
+
+/// Shared local-side implementation of the uploads dir contract (also what
+/// the broker enforces remotely): `~/.rcoder/uploads`, epoch-prefixed
+/// sanitized name, never overwrites.
+pub(crate) fn write_upload_local(name: &str, data: &[u8]) -> Result<String, TransportError> {
+    // Keep in lockstep with broker::sanitize_upload_name — paths land inside
+    // agent prompts, so spaces/hostile chars must never survive.
+    let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    let cleaned: String = base
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        .take(80)
+        .collect();
+    let cleaned = cleaned.trim_start_matches('.').to_string();
+    if cleaned.is_empty() {
+        return Err(TransportError::Protocol(format!(
+            "unusable attachment name {name:?}"
+        )));
+    }
+    let home = std::env::var("HOME")
+        .map_err(|_| TransportError::Protocol("HOME not set".into()))?;
+    let dir = std::path::Path::new(&home).join(".rcoder").join("uploads");
+    std::fs::create_dir_all(&dir).map_err(|e| TransportError::Protocol(e.to_string()))?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("{stamp}-{cleaned}"));
+    std::fs::write(&path, data).map_err(|e| TransportError::Protocol(e.to_string()))?;
+    Ok(path.display().to_string())
 }
 
 /// Duplex line channel for tmux control mode: we write tmux commands as

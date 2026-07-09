@@ -153,6 +153,10 @@ class RemoteCoderRepository(private val appContext: Context) {
         require().pressButton(pane, label)
     }
 
+    /** Upload an attachment to the host; returns the stored absolute path. */
+    suspend fun uploadAttachment(name: String, data: ByteArray): String =
+        withContext(Dispatchers.IO) { require().uploadAttachment(name, data) }
+
     companion object {
         @Volatile
         private var instance: RemoteCoderRepository? = null

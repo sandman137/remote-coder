@@ -2,6 +2,7 @@ package com.remotecoder.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
@@ -30,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +45,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -192,10 +199,20 @@ fun PaneScreen(
     onSend: (String) -> Unit,
     onScroll: (Int) -> Unit,
     onStt: () -> Unit,
+    onAttach: () -> Unit,
+    onAttachmentConsumed: () -> Unit,
     onViewport: (UShort, UShort) -> Unit,
 ) {
     val pane = (state.screen as? Screen.Pane)?.pane ?: return
     var input by remember { mutableStateOf("") }
+    // A finished upload drops its host path into the prompt, Claude-Code
+    // style (like dragging a file onto the terminal).
+    LaunchedEffect(state.attachment) {
+        state.attachment?.let { path ->
+            input = if (input.isBlank()) "$path " else "${input.trimEnd()} $path "
+            onAttachmentConsumed()
+        }
+    }
     val chips = state.metadata[pane.id]?.entries
         ?.sortedBy { it.key }
         ?.joinToString(" ") { "${it.key}:${it.value}" }
@@ -220,13 +237,18 @@ fun PaneScreen(
                 onViewport = onViewport,
             )
 
-            // Adapter/quick-action button row.
+            // Adapter/quick-action button row — scrolls horizontally so the
+            // Claude key row (Esc/Mode/↑/↓/Enter/Ctrl-C) and long adapter
+            // sets all stay reachable.
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                state.buttons.take(4).forEach { b ->
-                    Button(onClick = { onButton(b.label) }, Modifier.weight(1f)) {
+                state.buttons.forEach { b ->
+                    Button(onClick = { onButton(b.label) }) {
                         Text(b.label, maxLines = 1)
                     }
                 }
@@ -242,22 +264,28 @@ fun PaneScreen(
                 Button(onClick = onBack, Modifier.weight(1f)) { Text("Back") }
             }
 
-            // Text + speech-to-text input line.
+            // Prompt line: attach, type/dictate (the keyboard's own mic works
+            // here), IME Send or the send button submits — like Claude Code's
+            // prompt box.
+            val submit = {
+                if (input.isNotEmpty()) { onSend(input); input = "" } else onButton("Enter")
+            }
             Row(
                 Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(onClick = onAttach) { Icon(Icons.Default.AttachFile, "attach") }
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
+                    maxLines = 4,
                     placeholder = { Text("type or dictate…") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { submit() }),
                 )
                 IconButton(onClick = onStt) { Icon(Icons.Default.Mic, "dictate") }
-                IconButton(onClick = {
-                    if (input.isNotEmpty()) { onSend(input); input = "" } else onButton("Enter")
-                }) { Icon(Icons.Default.Send, "send") }
+                IconButton(onClick = submit) { Icon(Icons.Default.Send, "send") }
             }
 
             if (state.status.isNotEmpty()) {

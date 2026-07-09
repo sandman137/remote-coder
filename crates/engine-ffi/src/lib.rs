@@ -174,6 +174,14 @@ impl RemoteCoderEngine {
         Ok(())
     }
 
+    /// Upload an attachment to the host; returns the stored absolute path
+    /// (insert it into the agent's prompt — Claude Code reads paths/images).
+    pub fn upload_attachment(&self, name: String, data: Vec<u8>) -> Result<String, FfiError> {
+        Ok(self
+            .runtime
+            .block_on(self.engine.upload_attachment(&name, &data))?)
+    }
+
     /// Begin streaming a pane at the given viewport (Grid events follow).
     pub fn attach(&self, pane: String, cols: u16, rows: u16) -> Result<(), FfiError> {
         self.runtime

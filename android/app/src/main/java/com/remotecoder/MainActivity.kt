@@ -56,6 +56,8 @@ class MainActivity : FragmentActivity() {
                         onSend = vm::sendText,
                         onScroll = vm::scrollBy,
                         onStt = { startSpeechInput() },
+                        onAttach = { attachLauncher.launch("*/*") },
+                        onAttachmentConsumed = vm::consumeAttachment,
                         onViewport = vm::setViewport,
                     )
                 }
@@ -119,4 +121,9 @@ class MainActivity : FragmentActivity() {
             ?.firstOrNull()
         if (!text.isNullOrEmpty()) vm.sendText(text)
     }
+
+    /** Attachment picker (any file type); the upload path lands in the prompt. */
+    private val attachLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri -> if (uri != null) vm.attachFile(uri) }
 }
