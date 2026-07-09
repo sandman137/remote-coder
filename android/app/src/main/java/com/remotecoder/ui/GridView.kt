@@ -44,7 +44,7 @@ fun GridView(
     val density = LocalDensity.current
     val bgArgb = term.bg.toArgb()
     val fgArgb = term.defaultFg.toArgb()
-    val cursorArgb = Cosmic.cyan.toArgb()
+    val cursorArgb = Astro.cyan.toArgb()
     val ansi = term.ansi16
 
     val textPaint = remember(fontSizeSp) {

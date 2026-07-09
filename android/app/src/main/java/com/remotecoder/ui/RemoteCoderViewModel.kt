@@ -107,7 +107,9 @@ class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openPane(pane: PaneInfoFfi) {
-        update { copy(screen = Screen.Pane(pane), grid = null, scrollback = 0u) }
+        // Reset to generic controls; this pane's adapter Attention event
+        // refines them (and won't be overridden by other panes now).
+        update { copy(screen = Screen.Pane(pane), grid = null, scrollback = 0u, buttons = defaultButtons, status = "") }
         viewModelScope.launch {
             try {
                 repo.attach(pane.id, viewport.first, viewport.second)
@@ -177,16 +179,27 @@ class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
             is EngineEventFfi.Panes ->
                 if (ev.session == _state.value.session) update { copy(panes = ev.panes) }
             is EngineEventFfi.Attention -> {
+                // Track every waiting pane for the list badges, but only swap
+                // the open pane's buttons/status when the attention is for it —
+                // a background agent's prompt must not hijack the current view.
+                val isCurrent = (_state.value.screen as? Screen.Pane)?.pane?.id == ev.pane
                 update {
                     copy(
                         attention = attention + ev.pane,
-                        buttons = if (ev.buttons.isNotEmpty()) ev.buttons else buttons,
-                        status = "⚠ ${ev.agent} is waiting",
+                        buttons = if (isCurrent && ev.buttons.isNotEmpty()) ev.buttons else buttons,
+                        status = if (isCurrent) "⚠ ${ev.agent} is waiting" else status,
                     )
                 }
             }
-            is EngineEventFfi.AttentionCleared ->
-                update { copy(attention = attention - ev.pane) }
+            is EngineEventFfi.AttentionCleared -> {
+                val isCurrent = (_state.value.screen as? Screen.Pane)?.pane?.id == ev.pane
+                update {
+                    copy(
+                        attention = attention - ev.pane,
+                        status = if (isCurrent && status.startsWith("⚠")) "" else status,
+                    )
+                }
+            }
             is EngineEventFfi.Metadata -> {
                 val fields = ev.fields.associate { it.field to it.value }
                 update {

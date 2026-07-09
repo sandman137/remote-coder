@@ -1,18 +1,23 @@
 package com.remotecoder.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,8 +34,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.remotecoder.R
 import uniffi.remotecoder_engine.PaneInfoFfi
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +56,28 @@ fun PaneListScreen(
     onRefresh: () -> Unit,
 ) {
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Remote Coder — $session (${panes.size} panes)") })
+        TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White), title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painterResource(R.drawable.astro_bust),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp).clip(CircleShape),
+                )
+                Column(Modifier.padding(start = 10.dp)) {
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(androidx.compose.ui.text.SpanStyle(color = Astro.ink)) { append("Remote ") }
+                            withStyle(androidx.compose.ui.text.SpanStyle(color = Astro.magenta)) { append("Coder") }
+                        },
+                        fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
+                    )
+                    Text(
+                        "$session · ${panes.size} panes · tailnet",
+                        fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = Astro.muted,
+                    )
+                }
+            }
+        })
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
             items(panes, key = { it.id }) { pane ->
@@ -51,13 +86,20 @@ fun PaneListScreen(
                     onClick = { onOpen(pane) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.5.dp, if (waiting) Astro.magenta else Astro.line),
                 ) {
                     Row(
                         Modifier.padding(16.dp).fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (waiting) "⚠" else "●", Modifier.padding(end = 12.dp))
+                        Text(
+                            if (waiting) "⚠" else "●",
+                            color = if (waiting) Astro.magenta else Astro.mint,
+                            modifier = Modifier.padding(end = 12.dp),
+                        )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 "${pane.windowName}  ·  ${pane.currentCommand}",
@@ -97,7 +139,7 @@ fun PaneScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = {
+            TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White), title = {
                 Column {
                     Text("${pane.session}:${pane.windowIndex}.${pane.paneIndex} — ${pane.currentCommand}")
                     if (chips.isNotEmpty()) {
