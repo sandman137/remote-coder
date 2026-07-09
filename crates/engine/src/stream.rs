@@ -10,13 +10,15 @@ use std::time::Duration;
 
 use tokio::sync::mpsc;
 
+use crate::adapter::Registry;
+use crate::attention::{AttentionEngine, AttentionUpdate};
 use crate::error::{EngineError, TransportError};
 use crate::event::{EngineEvent, EventBus};
 use crate::grid::vt::VtScreen;
 use crate::grid::GridSnapshot;
 use crate::tmux::control::{ControlEvent, ControlParser};
 use crate::tmux::layout::parse_layout;
-use crate::tmux::{cmd, parse_geometry, parse_panes, PaneId};
+use crate::tmux::{cmd, parse_geometry, parse_panes, PaneId, PaneInfo};
 use crate::transport::{ControlChannel, Transport};
 
 const FLUSH_INTERVAL: Duration = Duration::from_millis(33);
@@ -60,6 +62,7 @@ pub(crate) async fn spawn(
     session: String,
     size: (u16, u16),
     bus: EventBus,
+    registry: Arc<Registry>,
 ) -> Result<StreamHandle, EngineError> {
     let channel = transport.open_control(&session, size).await?;
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
@@ -73,6 +76,11 @@ pub(crate) async fn spawn(
         watched: HashSet::new(),
         dirty: HashSet::new(),
         parser: ControlParser::new(),
+        registry,
+        attention: AttentionEngine::new(),
+        pane_adapters: HashMap::new(),
+        pane_commands: HashMap::new(),
+        pane_metadata: HashMap::new(),
     };
     let task = tokio::spawn(async move {
         streamer.run(channel, cmd_rx).await;
@@ -90,6 +98,14 @@ struct Streamer {
     watched: HashSet<String>,
     dirty: HashSet<String>,
     parser: ControlParser,
+    registry: Arc<Registry>,
+    attention: AttentionEngine,
+    /// pane id → adapter id, from detect() at enumeration time.
+    pane_adapters: HashMap<String, String>,
+    /// pane id → foreground command at last enumeration (for late detect).
+    pane_commands: HashMap<String, String>,
+    /// pane id → last seen metadata values (edge-triggered emission).
+    pane_metadata: HashMap<String, HashMap<String, String>>,
 }
 
 impl Streamer {
@@ -173,11 +189,37 @@ impl Streamer {
             self.prime_pane(&pane.id, pane.width, pane.height).await;
             self.dirty.insert(pane.id.0.clone());
         }
+        self.refresh_adapters(&panes);
         self.bus.emit(EngineEvent::Panes {
             session: self.session.clone(),
             panes,
         });
         Ok(())
+    }
+
+    /// (Re)detect which adapter drives each pane: by foreground command,
+    /// falling back to prompt patterns in the primed screen text. Panes
+    /// with no adapter yet get another chance at every flush (their prompt
+    /// may not have been printed at enumeration time).
+    fn refresh_adapters(&mut self, panes: &[PaneInfo]) {
+        for pane in panes {
+            self.pane_commands
+                .insert(pane.id.0.clone(), pane.current_command.clone());
+            let text = self
+                .screens
+                .get(&pane.id.0)
+                .map(|s| s.snapshot().to_text())
+                .unwrap_or_default();
+            match self.registry.detect(&pane.current_command, &text) {
+                Some(adapter) => {
+                    self.pane_adapters
+                        .insert(pane.id.0.clone(), adapter.id.clone());
+                }
+                None => {
+                    self.pane_adapters.remove(&pane.id.0);
+                }
+            }
+        }
     }
 
     async fn handle_cmd(
@@ -287,6 +329,7 @@ impl Streamer {
             .await
         {
             if let Ok(panes) = parse_panes(&raw) {
+                self.refresh_adapters(&panes);
                 self.bus.emit(EngineEvent::Panes {
                     session: self.session.clone(),
                     panes,
@@ -295,19 +338,23 @@ impl Streamer {
         }
     }
 
-    /// Emit Grid events for watched panes whose screens changed.
+    /// Emit Grid events for watched panes whose screens changed, and run
+    /// attention/metadata detection over *every* dirty pane — a background
+    /// pane waiting for approval must alert even when nobody watches it.
     fn flush_dirty(&mut self) {
         if self.dirty.is_empty() {
             return;
         }
         for pane_id in std::mem::take(&mut self.dirty) {
-            if !self.watched.contains(&pane_id) {
-                continue;
-            }
             let Some(screen) = self.screens.get(&pane_id) else {
                 continue;
             };
             let snapshot = screen.snapshot();
+            self.detect_attention(&pane_id, &snapshot);
+
+            if !self.watched.contains(&pane_id) {
+                continue;
+            }
             let dirty_rows = match self.prev.get(&pane_id) {
                 Some(prev) => {
                     let rows = snapshot.dirty_rows(prev);
@@ -323,6 +370,53 @@ impl Streamer {
                 pane: PaneId(pane_id),
                 snapshot,
                 dirty_rows,
+            });
+        }
+    }
+
+    /// Tier-3 attention + metadata for one pane (edge-triggered).
+    fn detect_attention(&mut self, pane_id: &str, snapshot: &GridSnapshot) {
+        // Late detection: a pane unmapped at enumeration time may have shown
+        // its identifying prompt since.
+        if !self.pane_adapters.contains_key(pane_id) {
+            let command = self.pane_commands.get(pane_id).cloned().unwrap_or_default();
+            if let Some(adapter) = self.registry.detect(&command, &snapshot.to_text()) {
+                self.pane_adapters
+                    .insert(pane_id.to_string(), adapter.id.clone());
+            }
+        }
+        let Some(adapter_id) = self.pane_adapters.get(pane_id) else {
+            return;
+        };
+        let Some(adapter) = self.registry.get(adapter_id) else {
+            return;
+        };
+
+        match self.attention.evaluate(pane_id, adapter, snapshot) {
+            Some(AttentionUpdate::Waiting(state)) => {
+                self.bus.emit(EngineEvent::Attention {
+                    pane: PaneId(pane_id.to_string()),
+                    agent: adapter.id.clone(),
+                    kind: state.kind,
+                    buttons: adapter.buttons.clone(),
+                });
+            }
+            Some(AttentionUpdate::Cleared) => {
+                self.bus.emit(EngineEvent::AttentionCleared {
+                    pane: PaneId(pane_id.to_string()),
+                });
+            }
+            None => {}
+        }
+
+        let last = self.pane_metadata.entry(pane_id.to_string()).or_default();
+        let changed = self
+            .attention
+            .extract_metadata(pane_id, adapter, snapshot, last);
+        if !changed.is_empty() {
+            self.bus.emit(EngineEvent::Metadata {
+                pane: PaneId(pane_id.to_string()),
+                fields: changed,
             });
         }
     }

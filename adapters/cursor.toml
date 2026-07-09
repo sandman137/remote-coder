@@ -11,6 +11,9 @@ attention = [
   'Run command\?',
 ]
 
+hook      = ""
+transport = "tmux"
+
 [[buttons]]
 label = "Yes"
 keys  = "y\n"
@@ -31,5 +34,3 @@ regex = 'tokens:\s*(\d+)'
 field = "tool"
 regex = '●\s*(\w+)'
 
-hook = ""
-transport = "tmux"

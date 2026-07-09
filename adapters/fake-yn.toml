@@ -1,0 +1,26 @@
+# Dev-fixture adapter for fixtures/agents/fake-yn.sh (never matches a real
+# agent). Ships as a built-in so `just tui` shows agent buttons + attention
+# against the fake session out of the box, and so attention tests are
+# deterministic (DESIGN.md §10.2).
+id   = "fake-yn"
+name = "Fake y/n Agent"
+
+launch = { cmd = "fake-yn.sh", args = [], cwd = "picker" }
+
+attention = ['Proceed\? \(y/n\)']
+
+hook      = ""
+transport = "tmux"
+
+[[buttons]]
+label = "Yes"
+keys  = "y"
+
+[[buttons]]
+label = "No"
+keys  = "n"
+
+[[metadata]]
+field = "tokens"
+regex = 'tokens:\s*(\d+)'
+

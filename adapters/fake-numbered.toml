@@ -1,0 +1,27 @@
+# Dev-fixture adapter for fixtures/agents/fake-numbered.sh (see fake-yn.toml).
+id   = "fake-numbered"
+name = "Fake Menu Agent"
+
+launch = { cmd = "fake-numbered.sh", args = [], cwd = "picker" }
+
+attention = ['1\) apply +2\) skip +3\) abort']
+
+hook      = ""
+transport = "tmux"
+
+[[buttons]]
+label = "Apply"
+keys  = "1"
+
+[[buttons]]
+label = "Skip"
+keys  = "2"
+
+[[buttons]]
+label = "Abort"
+keys  = "3"
+
+[[metadata]]
+field = "edit"
+regex = 'edit (\d+) ready'
+

@@ -11,6 +11,9 @@ attention = [
   'press enter to continue',
 ]
 
+hook      = ""
+transport = "tmux"
+
 [[buttons]]
 label = "Yes"
 keys  = "y"
@@ -27,5 +30,3 @@ keys  = "<Enter>"
 field = "tokens"
 regex = 'tokens used:\s*(\d+)'
 
-hook = ""
-transport = "tmux"

@@ -5,8 +5,10 @@
 pub mod run;
 pub mod ui;
 
+use std::collections::{HashMap, HashSet};
+
 use anyhow::Result;
-use engine::{Button, Engine, EngineEvent, EventStream, GridSnapshot, PaneInfo};
+use engine::{Button, Engine, EngineEvent, EventStream, GridSnapshot, PaneInfo, PromptKind};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tokio::sync::broadcast::error::TryRecvError;
 
@@ -45,6 +47,10 @@ pub struct App {
     pub streaming: bool,
     /// Last client size sent to the streamer, to reflow on viewport change.
     last_sent_size: Option<(u16, u16)>,
+    /// Panes currently waiting for input (attention badge in the list).
+    pub attention: HashSet<String>,
+    /// Latest extracted metadata per pane (header chips).
+    pub metadata: HashMap<String, HashMap<String, String>>,
 }
 
 fn default_buttons() -> Vec<Button> {
@@ -82,6 +88,8 @@ impl App {
             events,
             streaming: false,
             last_sent_size: None,
+            attention: HashSet::new(),
+            metadata: HashMap::new(),
         }
     }
 
@@ -136,6 +144,37 @@ impl App {
                     self.selected = self.selected.min(self.panes.len().saturating_sub(1));
                 }
             }
+            EngineEvent::Attention {
+                pane,
+                agent,
+                kind,
+                buttons,
+            } => {
+                self.attention.insert(pane.0.clone());
+                if self.selected_pane().is_some_and(|p| p.id == pane) {
+                    if !buttons.is_empty() {
+                        self.buttons = buttons;
+                    }
+                    let kind = match kind {
+                        PromptKind::YesNo => "y/n",
+                        PromptKind::Menu => "menu",
+                        PromptKind::FreeText => "input",
+                        PromptKind::Unknown => "input",
+                    };
+                    self.status = format!("⚠ {agent} is waiting ({kind})");
+                }
+            }
+            EngineEvent::AttentionCleared { pane } => {
+                self.attention.remove(&pane.0);
+                if self.selected_pane().is_some_and(|p| p.id == pane)
+                    && self.status.starts_with('⚠')
+                {
+                    self.status.clear();
+                }
+            }
+            EngineEvent::Metadata { pane, fields } => {
+                self.metadata.entry(pane.0).or_default().extend(fields);
+            }
             EngineEvent::Reconnecting => self.status = "reconnecting…".into(),
             EngineEvent::Connected => self.status.clear(),
             EngineEvent::Error(e) => {
@@ -144,6 +183,23 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// Metadata chips ("tokens:274 tool:Edit") for the focused pane.
+    pub fn metadata_chips(&self) -> String {
+        let Some(pane) = self.selected_pane() else {
+            return String::new();
+        };
+        let Some(fields) = self.metadata.get(&pane.id.0) else {
+            return String::new();
+        };
+        let mut pairs: Vec<_> = fields.iter().collect();
+        pairs.sort();
+        pairs
+            .into_iter()
+            .map(|(k, v)| format!("{k}:{v}"))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// Periodic work: drain events, poll snapshots where streaming doesn't
@@ -231,6 +287,11 @@ impl App {
                     self.scroll_offset = 0;
                     self.input.clear();
                     self.dirty = true;
+                    // Adapter-specific buttons when the pane's agent is known.
+                    self.buttons = match self.engine.adapter_for_pane(&pane).await {
+                        Ok(Some(adapter)) if !adapter.buttons.is_empty() => adapter.buttons,
+                        _ => default_buttons(),
+                    };
                     // Stream if we can; otherwise the tick() poll path covers us.
                     match self.engine.attach(&pane, self.grid_viewport).await {
                         Ok(()) => {

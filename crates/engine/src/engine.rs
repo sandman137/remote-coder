@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::adapter::{AgentAdapter, Registry};
 use crate::error::{EngineError, Result, TransportError};
 use crate::event::{EventBus, EventStream};
 use crate::grid::{sgr, GridSnapshot};
@@ -34,10 +35,20 @@ pub struct Engine {
     events: EventBus,
     /// One control-mode streamer per attached session (Phase 3).
     streamers: tokio::sync::Mutex<HashMap<String, StreamHandle>>,
+    registry: Arc<Registry>,
 }
 
 impl Engine {
     pub async fn connect(cfg: ConnConfig) -> Result<Engine> {
+        let registry = Registry::load_builtins_and_overrides().unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "adapter overrides failed; using builtins");
+            Registry::load_builtins().expect("builtin adapters must parse")
+        });
+        Self::connect_with_registry(cfg, registry).await
+    }
+
+    /// Dependency-injected variant (tests, custom adapter dirs).
+    pub async fn connect_with_registry(cfg: ConnConfig, registry: Registry) -> Result<Engine> {
         let transport: Arc<dyn Transport> = match cfg {
             ConnConfig::Local { socket } => Arc::new(LocalTransport::new(socket)),
             ConnConfig::Ssh { .. } => {
@@ -48,7 +59,12 @@ impl Engine {
             transport,
             events: EventBus::new(),
             streamers: tokio::sync::Mutex::new(HashMap::new()),
+            registry: Arc::new(registry),
         })
+    }
+
+    pub fn registry(&self) -> &Registry {
+        &self.registry
     }
 
     pub fn subscribe(&self) -> EventStream {
@@ -143,6 +159,7 @@ impl Engine {
                 session.clone(),
                 size,
                 self.events.clone(),
+                Arc::clone(&self.registry),
             )
             .await?;
             streamers.insert(session.clone(), handle);
@@ -192,6 +209,74 @@ impl Engine {
         Ok(())
     }
 
+    /// The adapter driving a pane, if detectable: by foreground command
+    /// first, then by prompt patterns in the visible text (§6.2).
+    pub async fn adapter_for_pane(&self, pane: &PaneId) -> Result<Option<AgentAdapter>> {
+        let out = self.transport.exec(&cmd::list_panes(None)).await?;
+        let panes = parse_panes(&out)?;
+        let Some(info) = panes.iter().find(|p| {
+            p.id == *pane || format!("{}:{}.{}", p.session, p.window_index, p.pane_index) == pane.0
+        }) else {
+            return Err(EngineError::NotFound(format!("pane {pane}")));
+        };
+        if let Some(a) = self.registry.detect(&info.current_command, "") {
+            return Ok(Some(a.clone()));
+        }
+        let text = self.snapshot(&info.id, 0).await?.to_text();
+        Ok(self.registry.detect(&info.current_command, &text).cloned())
+    }
+
+    /// Press a named adapter button on a pane (§7.1): resolves the pane's
+    /// adapter, looks the label up, sends its keys.
+    pub async fn press_button(&self, pane: &PaneId, button_label: &str) -> Result<()> {
+        let adapter = self
+            .adapter_for_pane(pane)
+            .await?
+            .ok_or_else(|| EngineError::UnknownAdapter(format!("no adapter for pane {pane}")))?;
+        let button = adapter
+            .buttons
+            .iter()
+            .find(|b| b.label.eq_ignore_ascii_case(button_label))
+            .ok_or_else(|| EngineError::UnknownButton {
+                adapter: adapter.id.clone(),
+                button: button_label.to_string(),
+            })?;
+        self.send_key_string(pane, &button.keys).await
+    }
+
+    /// Launch an agent in a fresh window of `session` (§7.1). `cwd`
+    /// overrides the adapter's policy; a "picker" adapter without a cwd
+    /// falls back to the remote user's home (tmux default).
+    pub async fn launch_agent(
+        &self,
+        session: &str,
+        adapter_id: &str,
+        cwd: Option<String>,
+    ) -> Result<PaneId> {
+        let adapter = self
+            .registry
+            .get(adapter_id)
+            .ok_or_else(|| EngineError::UnknownAdapter(adapter_id.to_string()))?;
+        let cwd = cwd.or(match &adapter.launch.cwd {
+            crate::adapter::CwdPolicy::Fixed(path) => Some(path.clone()),
+            crate::adapter::CwdPolicy::Picker => None,
+        });
+        // Command line for the new pane. Args are shell-quoted defensively;
+        // the launch cmd itself comes from trusted adapter config.
+        let mut shell_cmd = adapter.launch.cmd.clone();
+        for arg in &adapter.launch.args {
+            shell_cmd.push(' ');
+            shell_cmd.push_str(&shell_quote(arg));
+        }
+        let argv = cmd::new_window(session, &adapter.id, cwd.as_deref(), &shell_cmd);
+        let out = self.transport.exec(&argv).await?;
+        let id = String::from_utf8_lossy(&out).trim().to_string();
+        if id.is_empty() {
+            return Err(EngineError::Parse("new-window returned no pane id".into()));
+        }
+        Ok(PaneId(id))
+    }
+
     /// Which session a pane belongs to. `sess:win.pane` targets parse
     /// directly; `%id` panes are looked up across all sessions.
     async fn resolve_session(&self, pane: &PaneId) -> Result<String> {
@@ -220,4 +305,16 @@ impl Engine {
             .cloned()
             .ok_or_else(|| EngineError::NotFound(format!("pane {needle} in session {session}")))
     }
+}
+
+/// Single-quote a string for the POSIX shell that tmux hands new-window
+/// commands to.
+fn shell_quote(s: &str) -> String {
+    if !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-_./=:".contains(c))
+    {
+        return s.to_string();
+    }
+    format!("'{}'", s.replace('\'', r"'\''"))
 }

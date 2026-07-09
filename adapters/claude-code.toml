@@ -6,16 +6,20 @@ name = "Claude Code"
 launch = { cmd = "claude", args = [], cwd = "picker" }
 
 # Tier-3 attention: matched against recent pane text.
+# No bare '(y/n)' here: Claude Code prompts are numbered menus; a generic
+# pattern would shadow other agents' y/n prompts in text-based detection.
 attention = [
   'Do you want to proceed\?',
   'Do you want to make this edit',
   'Do you want to run this command',
-  '\(y/n\)',
   '❯\s*1\.\s*Yes',
   'Waiting for your input',
 ]
 
 # Buttons: literal keys, with <Name> tokens for tmux special keys.
+hook      = "claude-code-hook.sh"
+transport = "tmux"
+
 [[buttons]]
 label = "Yes"
 keys  = "1"
@@ -41,7 +45,3 @@ regex = '●\s+(\w+)'
 field = "tokens"
 regex = '(\d+) tokens'
 
-# Tier-1: Claude Code Notification/PreToolUse hooks call the notifier (Phase 7).
-hook = "claude-code-hook.sh"
-
-transport = "tmux"

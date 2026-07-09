@@ -42,6 +42,10 @@ pub enum EngineEvent {
         kind: PromptKind,
         buttons: Vec<Button>,
     },
+    /// A previously-waiting pane no longer shows its prompt.
+    AttentionCleared {
+        pane: PaneId,
+    },
     Metadata {
         pane: PaneId,
         fields: HashMap<String, String>,

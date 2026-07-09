@@ -25,26 +25,33 @@ fn draw_list(frame: &mut Frame, app: &mut App) {
         .iter()
         .enumerate()
         .map(|(i, p)| {
-            let marker = if p.active && p.window_active {
+            let waiting = app.attention.contains(&p.id.0);
+            let marker = if waiting {
+                "⚠"
+            } else if p.active && p.window_active {
                 "●"
             } else {
                 " "
             };
             let line = format!(
-                "{marker} {}:{}.{}  {:<12}  {:<12}  {}x{}",
+                "{marker} {}:{}.{}  {:<12}  {:<12}  {}x{}{}",
                 p.session,
                 p.window_index,
                 p.pane_index,
                 p.window_name,
                 p.current_command,
                 p.width,
-                p.height
+                p.height,
+                if waiting { "  needs input" } else { "" }
             );
-            let style = if i == app.selected {
+            let mut style = if i == app.selected {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()
             };
+            if waiting {
+                style = style.fg(Color::Yellow).add_modifier(Modifier::BOLD);
+            }
             ListItem::new(line).style(style)
         })
         .collect();
@@ -82,9 +89,10 @@ fn draw_pane(frame: &mut Frame, app: &mut App) {
     };
     app.grid_viewport = (inner.width, inner.height);
 
+    let chips = app.metadata_chips();
     let title = match app.selected_pane() {
         Some(p) => format!(
-            " {}:{}.{} {} — {} [{}x{}]{} ",
+            " {}:{}.{} {} — {} [{}x{}]{}{} ",
             p.session,
             p.window_index,
             p.pane_index,
@@ -92,6 +100,11 @@ fn draw_pane(frame: &mut Frame, app: &mut App) {
             p.current_command,
             p.width,
             p.height,
+            if chips.is_empty() {
+                String::new()
+            } else {
+                format!("  {chips}")
+            },
             if app.scroll_offset > 0 {
                 format!("  (scrolled -{})", app.scroll_offset)
             } else {

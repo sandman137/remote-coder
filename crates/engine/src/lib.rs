@@ -8,6 +8,8 @@
 //! Log discipline (DESIGN.md §13): pane content appears only at `trace`
 //! level; `info` and below must never carry code or prompt text.
 
+pub mod adapter;
+pub mod attention;
 mod engine;
 pub mod error;
 pub mod event;
@@ -16,6 +18,7 @@ mod stream;
 pub mod tmux;
 pub mod transport;
 
+pub use adapter::{AgentAdapter, Registry};
 pub use engine::{ConnConfig, Engine};
 pub use error::{EngineError, Result, TransportError};
 pub use event::{Button, EngineEvent, EventStream, PromptKind};
