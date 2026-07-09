@@ -62,5 +62,6 @@ The entire product experience runs on Linux today: `just tui` (local) and
 `just tui-ssh` (over SSH → loopback → broker) deliver sessions, live
 streaming, approve/reject buttons, attention badges, and metadata chips. Per
 DESIGN.md §3, a green engine over `SshTransport`-to-loopback ≈ a green Android
-app over the tailnet — and the [Android client](android/) consumes the exact
-same engine through the generated UniFFI bindings.
+app over the internet — and the [Android client](android/) consumes the exact
+same engine through the generated UniFFI bindings. Connecting a phone needs
+nothing but the app: see [docs/CONNECTING.md](docs/CONNECTING.md).

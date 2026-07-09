@@ -54,12 +54,27 @@ class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             repo.events.collect { onEvent(it) }
         }
-        // Hold the cosmic splash briefly, then reveal pairing — unless a
-        // deep link (or reconnect) has already advanced the screen.
+        // Cold start: if a host was paired before, reconnect with the stored
+        // key + pinned host key (no re-pairing; enroll tokens are single-use).
+        // Otherwise hold the splash briefly, then reveal pairing — unless a
+        // deep link has already advanced the screen.
         viewModelScope.launch {
+            val saved = repo.savedHost()
             kotlinx.coroutines.delay(1700)
-            if (_state.value.screen is Screen.Splash) {
+            if (_state.value.screen !is Screen.Splash) return@launch
+            if (saved == null) {
                 update { copy(screen = Screen.Pairing) }
+                return@launch
+            }
+            try {
+                update { copy(status = "reconnecting to ${saved.host}…") }
+                repo.connectSsh(saved)
+                update { copy(connected = true, screen = Screen.PaneList, status = "connected") }
+                refreshPanes()
+            } catch (e: Exception) {
+                update {
+                    copy(screen = Screen.Pairing, error = "reconnect failed: ${e.message} — re-pair below")
+                }
             }
         }
     }

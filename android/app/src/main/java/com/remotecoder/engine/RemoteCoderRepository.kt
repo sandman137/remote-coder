@@ -47,8 +47,44 @@ class RemoteCoderRepository(private val appContext: Context) {
 
     suspend fun pair(payloadJson: String, device: String): PairedHostFfi =
         withContext(Dispatchers.IO) {
-            pairEnroll(payloadJson, device, keysDir())
+            pairEnroll(payloadJson, device, keysDir()).also(::saveHost)
         }
+
+    // --- paired-host persistence -----------------------------------------
+    // The Rust side persists the device key + host-key pin under keysDir();
+    // the connection parameters live here so a cold start can reconnect
+    // without re-pairing (enroll tokens are single-use).
+
+    private fun prefs() = appContext.getSharedPreferences("rcoder", Context.MODE_PRIVATE)
+
+    private fun saveHost(h: PairedHostFfi) {
+        prefs().edit()
+            .putString("host", h.host)
+            .putInt("port", h.port.toInt())
+            .putString("user", h.user)
+            .putString("keyPath", h.keyPath)
+            .putString("hostkeyFp", h.hostkeyFp)
+            .apply()
+    }
+
+    /** The last successfully paired host, or null if never paired. */
+    fun savedHost(): PairedHostFfi? {
+        val p = prefs()
+        val host = p.getString("host", null) ?: return null
+        return PairedHostFfi(
+            host = host,
+            port = p.getInt("port", 0).toUShort(),
+            user = p.getString("user", "") ?: "",
+            keyPath = p.getString("keyPath", "") ?: "",
+            hostkeyFp = p.getString("hostkeyFp", "") ?: "",
+        )
+    }
+
+    /** Drop the stored pairing (e.g. after the host revoked this device). */
+    fun forgetHost() {
+        prefs().edit().remove("host").remove("port").remove("user")
+            .remove("keyPath").remove("hostkeyFp").apply()
+    }
 
     suspend fun connectSsh(host: PairedHostFfi) = withContext(Dispatchers.IO) {
         connect(
