@@ -67,9 +67,18 @@ On pairing the app generates a hardware-backed SSH key (never leaves the
 phone), enrolls its public key over the one-time token, pins the host's key
 fingerprint, then connects and lists your agent panes.
 
-Tap a pane to watch it live. When an agent asks a question, the app surfaces
-**Yes / No / Apply / Skip** buttons and a keyboard; taps are delivered as real
-keystrokes into that pane.
+Tap a pane to watch it live. The controls mirror Claude Code's own prompt:
+
+- **Key row**: `Esc` (interrupt) · `Mode` (Shift-Tab — cycles manual /
+  auto-accept / plan) · `↑ ↓` (history) · `Enter` · `Ctrl-C`. When an agent
+  asks a question, the row swaps to its actual choices (**Yes / No / 1 / 2**…).
+- **📎 Attachments**: pick a photo or file; it uploads to the host over the
+  same SSH channel (sandboxed to `~/.rcoder/uploads`, 16 MB cap) and its path
+  drops into your prompt — Claude Code reads paths natively, so images reach
+  its vision.
+- **Dictation**: the input line is a normal Android text field — your
+  keyboard's mic (Gboard voice typing) works, plus a dedicated 🎤 button.
+- **Send** = text + Enter, like Claude Code's prompt box.
 
 ---
 
