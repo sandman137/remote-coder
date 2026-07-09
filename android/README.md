@@ -74,13 +74,23 @@ adb shell am start -a android.intent.action.VIEW -d helm://connect \
   (connect, snapshot with color, streaming via poll + callback, send-keys,
   press-button). Per DESIGN.md §3, a green engine over
   `SshTransport`-to-loopback ≈ a green Android app over the tailnet.
-- **Emulator run: not possible on the authoring host** — it has no hardware
-  virtualization (`/dev/kvm` absent, no `vmx`/`svm` CPU flags), so the
-  emulator falls back to full software instruction translation (QEMU TCG).
-  Android 14 does not reach a usable state that way (after ~20 min a shell
-  `getprop` still times out), and the modern emulator refuses ARM64 images on
-  an x86_64 host. On a KVM-capable machine the lean APK above installs and the
-  `helm://connect` flow runs end to end against the loopback broker/tmux.
+- **Emulator run: verified end to end on an Apple Silicon Mac.** The original
+  Linux authoring host has no hardware virtualization (`/dev/kvm` absent, no
+  `vmx`/`svm` flags), so its emulator can't boot usably (QEMU TCG is too slow;
+  the modern emulator also refuses ARM64 images on x86_64 hosts). On an
+  Apple Silicon Mac (arm64 image, Hypervisor.framework) the emulator boots in
+  seconds and the full flow runs:
+  1. `helm pair --pair-host <linux-tailnet-ip> --ssh-port <port>` on the dev
+     host (the broker sshd + `agents` tmux session);
+  2. `helm://connect` on the emulator → the app generates its device key,
+     enrolls over the tailnet, and pins the host key;
+  3. the app connects via russh → the SSH forced command runs
+     `broker --session agents` (scoped, least-privilege) → the app lists the
+     live panes, streams a pane (colors, cursor, `tokens:` chip, adapter
+     Yes/No buttons, "⚠ waiting" attention), and **Yes** round-trips a
+     keystroke through the broker into tmux (the fake agent advances,
+     tokens 137→274). This is the exact HELM topology: phone (emulator) →
+     remote dev host over the tailnet, through the broker.
 
 ## Remaining hardening (tracked)
 
