@@ -72,7 +72,7 @@ fun PaneListScreen(
                         fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp,
                     )
                     Text(
-                        "$session · ${panes.size} panes · tailnet",
+                        "$session · ${panes.size} panes · ssh",
                         fontFamily = FontFamily.Monospace, fontSize = 10.sp, color = Astro.muted,
                     )
                 }

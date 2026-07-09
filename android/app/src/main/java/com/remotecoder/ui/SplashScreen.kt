@@ -42,7 +42,7 @@ import com.remotecoder.R
  * screen and fades into white where the wordmark and connecting indicator sit.
  */
 @Composable
-fun SplashScreen(status: String = "connecting to tailnet") {
+fun SplashScreen(status: String = "connecting") {
     val transition = rememberInfiniteTransition(label = "splash")
     val pip by transition.animateFloat(
         initialValue = 0f, targetValue = 3f,

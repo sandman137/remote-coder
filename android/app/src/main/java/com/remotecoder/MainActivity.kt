@@ -34,7 +34,7 @@ class MainActivity : FragmentActivity() {
                 val state by vm.state.collectAsState()
                 when (state.screen) {
                     is Screen.Splash -> SplashScreen(
-                        status = state.status.ifEmpty { "connecting to tailnet" },
+                        status = state.status.ifEmpty { "connecting" },
                     )
                     is Screen.Pairing -> PairingScreen(
                         error = state.error,

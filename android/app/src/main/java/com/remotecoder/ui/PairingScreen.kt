@@ -64,7 +64,7 @@ fun PairingScreen(
     ) {
         Text("Pair with your dev host", style = MaterialTheme.typography.headlineSmall)
         Text(
-            "Run  rcoder pair --pair-host <tailnet-ip>  on the host and scan its QR.",
+            "Run  scripts/rcoder-host.sh  on your dev box and scan its QR.",
             style = MaterialTheme.typography.bodyMedium,
         )
 
