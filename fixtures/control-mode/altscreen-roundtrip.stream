@@ -1,0 +1,5 @@
+%output %0 shell prompt $\015\012
+%output %0 \033[?1049h\033[2J\033[H
+%output %0 \033[3;5HALT-SCREEN-UI
+%output %0 \033[?1049l
+%exit

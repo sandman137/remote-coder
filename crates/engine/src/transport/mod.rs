@@ -40,5 +40,11 @@ pub trait ControlChannel: Send {
 
     /// Next raw control-mode line without its trailing newline.
     /// `Ok(None)` = orderly EOF.
+    ///
+    /// CONTRACT: implementations MUST be cancellation-safe — the streamer
+    /// polls this inside `tokio::select!`, so the future is routinely dropped
+    /// mid-read. Partial bytes must survive in the implementation's buffer,
+    /// never be discarded. (Use a persistent accumulator + `read_buf`, not
+    /// `read_until` with a cleared buffer.)
     async fn read_line(&mut self) -> Result<Option<Vec<u8>>, TransportError>;
 }

@@ -217,8 +217,10 @@ async fn tui_scroll_offset_pages_and_clamps() {
     .unwrap();
     let mut app = App::new(engine, "agents".to_string());
     app.refresh_panes().await;
-    app.handle_key(key(KeyCode::Enter)).await;
+    // Viewport must be set before opening the pane: attach() sends it as the
+    // control-client size and tmux reflows the window to match.
     app.grid_viewport = (78, 10);
+    app.handle_key(key(KeyCode::Enter)).await;
     tick_until(&mut app, |a| grid_contains(a, "line-40"), "tail").await;
 
     app.handle_key(key(KeyCode::PageUp)).await;

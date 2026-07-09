@@ -1,7 +1,9 @@
 //! tmux protocol layer: command builders + stable `-F` enumeration parsers
 //! (DESIGN.md §4.4). Commands are built as argv arrays — never shell strings.
 
+pub mod control;
 pub mod keys;
+pub mod layout;
 
 use crate::error::EngineError;
 

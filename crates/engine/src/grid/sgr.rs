@@ -10,15 +10,8 @@
 
 use unicode_width::UnicodeWidthChar;
 
-use super::{Cell, CellAttrs, Color, GridSnapshot};
-
-/// Current pen (fg/bg/attrs) while scanning.
-#[derive(Debug, Clone, Copy, Default)]
-struct Pen {
-    fg: Color,
-    bg: Color,
-    attrs: CellAttrs,
-}
+use super::pen::{apply_sgr_tokens, Pen};
+use super::{Cell, CellAttrs, GridSnapshot};
 
 /// Parse captured lines into a `cols`-wide grid with at least `min_rows` rows
 /// (padded with blanks at the bottom, as tmux omits trailing blank lines).
@@ -126,79 +119,22 @@ fn parse_line(line: &str, pen: &mut Pen, grid: &mut GridSnapshot, row: u16) {
 }
 
 /// Apply an SGR parameter string (`"1;38;5;196"`). Handles both `;` and `:`
-/// separated extended-color forms.
+/// separated extended-color forms by flattening to one token stream.
 fn apply_sgr(params: &str, pen: &mut Pen) {
     if params.is_empty() {
         *pen = Pen::default();
         return;
     }
-
-    // Normalize "38:5:196" into the same token stream as "38;5;196".
     let toks: Vec<u16> = params
         .split([';', ':'])
         .map(|p| p.parse::<u16>().unwrap_or(0))
         .collect();
-
-    let mut i = 0;
-    while i < toks.len() {
-        let p = toks[i];
-        match p {
-            0 => *pen = Pen::default(),
-            1 => pen.attrs.set(CellAttrs::BOLD, true),
-            2 => pen.attrs.set(CellAttrs::DIM, true),
-            3 => pen.attrs.set(CellAttrs::ITALIC, true),
-            4 => pen.attrs.set(CellAttrs::UNDERLINE, true),
-            5 => pen.attrs.set(CellAttrs::BLINK, true),
-            7 => pen.attrs.set(CellAttrs::REVERSE, true),
-            9 => pen.attrs.set(CellAttrs::STRIKE, true),
-            22 => {
-                pen.attrs.set(CellAttrs::BOLD, false);
-                pen.attrs.set(CellAttrs::DIM, false);
-            }
-            23 => pen.attrs.set(CellAttrs::ITALIC, false),
-            24 => pen.attrs.set(CellAttrs::UNDERLINE, false),
-            25 => pen.attrs.set(CellAttrs::BLINK, false),
-            27 => pen.attrs.set(CellAttrs::REVERSE, false),
-            29 => pen.attrs.set(CellAttrs::STRIKE, false),
-            30..=37 => pen.fg = Color::Indexed((p - 30) as u8),
-            39 => pen.fg = Color::Default,
-            40..=47 => pen.bg = Color::Indexed((p - 40) as u8),
-            49 => pen.bg = Color::Default,
-            90..=97 => pen.fg = Color::Indexed((p - 90 + 8) as u8),
-            100..=107 => pen.bg = Color::Indexed((p - 100 + 8) as u8),
-            38 | 48 => {
-                let is_fg = p == 38;
-                match toks.get(i + 1) {
-                    Some(5) => {
-                        let idx = toks.get(i + 2).copied().unwrap_or(0).min(255) as u8;
-                        if is_fg {
-                            pen.fg = Color::Indexed(idx);
-                        } else {
-                            pen.bg = Color::Indexed(idx);
-                        }
-                        i += 2;
-                    }
-                    Some(2) => {
-                        let c = |k: usize| toks.get(i + k).copied().unwrap_or(0).min(255) as u8;
-                        let rgb = Color::Rgb(c(2), c(3), c(4));
-                        if is_fg {
-                            pen.fg = rgb;
-                        } else {
-                            pen.bg = rgb;
-                        }
-                        i += 4;
-                    }
-                    _ => {}
-                }
-            }
-            _ => {} // unhandled SGR: ignore
-        }
-        i += 1;
-    }
+    apply_sgr_tokens(&toks, pen);
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::Color;
     use super::*;
 
     fn cell(g: &GridSnapshot, col: u16, row: u16) -> Cell {

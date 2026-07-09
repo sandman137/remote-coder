@@ -1,0 +1,7 @@
+%begin 1751970000 1 1
+%end 1751970000 1 1
+%output %0 plain text\015\012
+%output %0 \033[31mred\033[0m and \033[38;5;196mbright\033[0m\015\012
+%output %0 caf\303\251 \\ backslash\015\012
+%output %0 \033[38;2;255;128;0mtruecolor\033[0m
+%exit

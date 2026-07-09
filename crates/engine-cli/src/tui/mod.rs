@@ -6,8 +6,9 @@ pub mod run;
 pub mod ui;
 
 use anyhow::Result;
-use engine::{Button, Engine, GridSnapshot, PaneInfo};
+use engine::{Button, Engine, EngineEvent, EventStream, GridSnapshot, PaneInfo};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use tokio::sync::broadcast::error::TryRecvError;
 
 /// Snapshot poll cadence while a pane is focused (DESIGN.md §4.1).
 pub const POLL_INTERVAL_MS: u64 = 300;
@@ -37,6 +38,13 @@ pub struct App {
     pub grid_viewport: (u16, u16),
     /// Set when the next loop iteration should tick immediately.
     pub dirty: bool,
+    /// Engine event stream (Grid/Panes/Connected/… — Phase 3 streaming).
+    events: EventStream,
+    /// True once attach() succeeded for the focused pane: grids arrive as
+    /// events and snapshot polling stops (except in scrollback).
+    pub streaming: bool,
+    /// Last client size sent to the streamer, to reflow on viewport change.
+    last_sent_size: Option<(u16, u16)>,
 }
 
 fn default_buttons() -> Vec<Button> {
@@ -56,6 +64,7 @@ fn default_buttons() -> Vec<Button> {
 
 impl App {
     pub fn new(engine: Engine, session: String) -> Self {
+        let events = engine.subscribe();
         App {
             engine,
             session,
@@ -70,6 +79,9 @@ impl App {
             should_quit: false,
             grid_viewport: (80, 24),
             dirty: true,
+            events,
+            streaming: false,
+            last_sent_size: None,
         }
     }
 
@@ -90,9 +102,55 @@ impl App {
         }
     }
 
-    /// Periodic work: poll the focused pane's snapshot.
+    /// Drain pending engine events into app state.
+    fn drain_events(&mut self) {
+        loop {
+            match self.events.try_recv() {
+                Ok(ev) => self.apply_event(ev),
+                Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+                Err(TryRecvError::Lagged(_)) => continue,
+            }
+        }
+    }
+
+    fn apply_event(&mut self, ev: EngineEvent) {
+        match ev {
+            EngineEvent::Grid { pane, snapshot, .. } => {
+                // Live tail only: in scrollback the poll path owns the grid.
+                if self.view == View::Pane
+                    && self.scroll_offset == 0
+                    && self.selected_pane().is_some_and(|p| p.id == pane)
+                {
+                    self.grid = Some(snapshot);
+                }
+            }
+            EngineEvent::Panes { session, panes } => {
+                if session == self.session {
+                    let keep = self.selected_pane().map(|p| p.id.clone());
+                    self.panes = panes;
+                    if let Some(id) = keep {
+                        if let Some(i) = self.panes.iter().position(|p| p.id == id) {
+                            self.selected = i;
+                        }
+                    }
+                    self.selected = self.selected.min(self.panes.len().saturating_sub(1));
+                }
+            }
+            EngineEvent::Reconnecting => self.status = "reconnecting…".into(),
+            EngineEvent::Connected => self.status.clear(),
+            EngineEvent::Error(e) => {
+                self.status = format!("stream: {e}");
+                self.streaming = false; // fall back to polling
+            }
+            _ => {}
+        }
+    }
+
+    /// Periodic work: drain events, poll snapshots where streaming doesn't
+    /// cover us, and push viewport changes to the streamer for reflow.
     pub async fn tick(&mut self) {
         self.dirty = false;
+        self.drain_events();
         match self.view {
             View::List => self.refresh_panes().await,
             View::Pane => {
@@ -100,6 +158,16 @@ impl App {
                     self.view = View::List;
                     return;
                 };
+                // Rotation/resize: retarget the tmux client size (§4.3).
+                if self.streaming && self.last_sent_size != Some(self.grid_viewport) {
+                    let (cols, rows) = self.grid_viewport;
+                    if self.engine.resize(&pane, cols, rows).await.is_ok() {
+                        self.last_sent_size = Some(self.grid_viewport);
+                    }
+                }
+                if self.streaming && self.scroll_offset == 0 {
+                    return; // Grid events own the live tail
+                }
                 match self.engine.snapshot(&pane, self.scroll_offset).await {
                     Ok(grid) => {
                         // Clamp scroll to the history that actually exists.
@@ -157,12 +225,23 @@ impl App {
             }
             KeyCode::Char('r') => self.refresh_panes().await,
             KeyCode::Enter | KeyCode::Char('l') => {
-                if self.selected_pane().is_some() {
+                if let Some(pane) = self.selected_pane().map(|p| p.id.clone()) {
                     self.view = View::Pane;
                     self.grid = None;
                     self.scroll_offset = 0;
                     self.input.clear();
                     self.dirty = true;
+                    // Stream if we can; otherwise the tick() poll path covers us.
+                    match self.engine.attach(&pane, self.grid_viewport).await {
+                        Ok(()) => {
+                            self.streaming = true;
+                            self.last_sent_size = Some(self.grid_viewport);
+                        }
+                        Err(e) => {
+                            self.streaming = false;
+                            self.status = format!("streaming unavailable ({e}); polling");
+                        }
+                    }
                 }
             }
             _ => {}
@@ -173,6 +252,10 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 if self.input.is_empty() {
+                    if let Some(pane) = self.selected_pane().map(|p| p.id.clone()) {
+                        let _ = self.engine.detach(&pane).await;
+                    }
+                    self.streaming = false;
                     self.view = View::List;
                     self.dirty = true;
                 } else {

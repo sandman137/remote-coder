@@ -2,7 +2,9 @@
 //! UniFFI exposes. Two producers: the SGR fast path (snapshot mode, this
 //! phase) and the VT state machine (streaming mode, Phase 3).
 
+pub mod pen;
 pub mod sgr;
+pub mod vt;
 
 /// Terminal color: default / 256-indexed / truecolor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

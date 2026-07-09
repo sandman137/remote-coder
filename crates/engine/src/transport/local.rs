@@ -5,6 +5,7 @@
 use std::process::Stdio;
 use std::time::Duration;
 
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::{ControlChannel, Transport};
@@ -70,12 +71,83 @@ impl Transport for LocalTransport {
 
     async fn open_control(
         &self,
-        _session: &str,
+        session: &str,
         _size: (u16, u16),
     ) -> Result<Box<dyn ControlChannel>, TransportError> {
-        // Lands in Phase 3 (control-mode streaming).
-        Err(TransportError::Unsupported(
-            "LocalTransport::open_control arrives in Phase 3",
-        ))
+        // Client size is set by the streamer via `refresh-client -C` right
+        // after attach (control clients have no tty to size).
+        let mut cmd = Command::new(&self.tmux_bin);
+        cmd.args(self.base_argv())
+            .arg("-C")
+            .arg("attach-session")
+            .arg("-t")
+            .arg(format!("={session}"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true);
+
+        let mut child = cmd.spawn()?;
+        let stdin = child.stdin.take().ok_or(TransportError::Closed)?;
+        let stdout = child.stdout.take().ok_or(TransportError::Closed)?;
+        Ok(Box::new(LocalControlChannel {
+            _child: child,
+            stdin,
+            stdout,
+            acc: Vec::with_capacity(8192),
+            eof: false,
+        }))
+    }
+}
+
+struct LocalControlChannel {
+    /// Held for kill_on_drop — dropping the channel ends the tmux client.
+    _child: tokio::process::Child,
+    stdin: tokio::process::ChildStdin,
+    stdout: tokio::process::ChildStdout,
+    /// Accumulator that survives cancelled `read_line` futures (see the
+    /// cancellation-safety contract on `ControlChannel::read_line`).
+    acc: Vec<u8>,
+    eof: bool,
+}
+
+impl LocalControlChannel {
+    /// Pop one complete line (without newline) from the accumulator.
+    fn take_line(&mut self) -> Option<Vec<u8>> {
+        let pos = self.acc.iter().position(|&b| b == b'\n')?;
+        let mut line: Vec<u8> = self.acc.drain(..=pos).collect();
+        line.pop(); // the newline
+        Some(line)
+    }
+}
+
+#[async_trait::async_trait]
+impl ControlChannel for LocalControlChannel {
+    async fn write_line(&mut self, line: &str) -> Result<(), TransportError> {
+        self.stdin.write_all(line.as_bytes()).await?;
+        self.stdin.write_all(b"\n").await?;
+        self.stdin.flush().await?;
+        Ok(())
+    }
+
+    async fn read_line(&mut self) -> Result<Option<Vec<u8>>, TransportError> {
+        use tokio::io::AsyncReadExt;
+        loop {
+            if let Some(line) = self.take_line() {
+                return Ok(Some(line));
+            }
+            if self.eof {
+                // Final unterminated fragment, then EOF forever.
+                if self.acc.is_empty() {
+                    return Ok(None);
+                }
+                return Ok(Some(std::mem::take(&mut self.acc)));
+            }
+            // Single read syscall per await point: cancellation-safe.
+            let n = self.stdout.read_buf(&mut self.acc).await?;
+            if n == 0 {
+                self.eof = true;
+            }
+        }
     }
 }

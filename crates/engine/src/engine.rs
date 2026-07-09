@@ -1,10 +1,12 @@
 //! The `Engine` facade (DESIGN.md §7.1) — the one public entrypoint UIs use.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::error::{EngineError, Result, TransportError};
 use crate::event::{EventBus, EventStream};
 use crate::grid::{sgr, GridSnapshot};
+use crate::stream::{self, StreamCmd, StreamHandle};
 use crate::tmux::keys::{parse_key_string, KeyInput};
 use crate::tmux::{
     cmd, parse_geometry, parse_panes, parse_sessions, PaneId, PaneInfo, SessionInfo,
@@ -30,6 +32,8 @@ pub enum ConnConfig {
 pub struct Engine {
     transport: Arc<dyn Transport>,
     events: EventBus,
+    /// One control-mode streamer per attached session (Phase 3).
+    streamers: tokio::sync::Mutex<HashMap<String, StreamHandle>>,
 }
 
 impl Engine {
@@ -43,6 +47,7 @@ impl Engine {
         Ok(Engine {
             transport,
             events: EventBus::new(),
+            streamers: tokio::sync::Mutex::new(HashMap::new()),
         })
     }
 
@@ -121,9 +126,59 @@ impl Engine {
         self.send_keys(pane, &parse_key_string(keys)).await
     }
 
-    /// Resize the window containing `pane` (snapshot-mode reflow; streaming
-    /// mode gains `refresh-client -C` in Phase 3).
+    /// Begin streaming a pane: attaches a control-mode client to the pane's
+    /// session (shared per session), sets the client size so tmux reflows for
+    /// this viewport (§4.3), and marks the pane watched — `EngineEvent::Grid`
+    /// with dirty rows flows from here on.
+    pub async fn attach(&self, pane: &PaneId, size: (u16, u16)) -> Result<()> {
+        let session = self.resolve_session(pane).await?;
+        let mut streamers = self.streamers.lock().await;
+        // Replace a dead streamer (e.g. reconnect exhausted).
+        if streamers.get(&session).is_some_and(|h| !h.is_alive()) {
+            streamers.remove(&session);
+        }
+        if !streamers.contains_key(&session) {
+            let handle = stream::spawn(
+                Arc::clone(&self.transport),
+                session.clone(),
+                size,
+                self.events.clone(),
+            )
+            .await?;
+            streamers.insert(session.clone(), handle);
+        }
+        let handle = streamers.get(&session).expect("just inserted");
+        let _ = handle.cmd_tx.send(StreamCmd::SetSize {
+            cols: size.0,
+            rows: size.1,
+        });
+        let _ = handle.cmd_tx.send(StreamCmd::Watch(pane.clone()));
+        Ok(())
+    }
+
+    /// Stop emitting Grid events for a pane. The session streamer stays warm
+    /// for quick re-attach; it dies with the Engine.
+    pub async fn detach(&self, pane: &PaneId) -> Result<()> {
+        if let Ok(session) = self.resolve_session(pane).await {
+            if let Some(handle) = self.streamers.lock().await.get(&session) {
+                let _ = handle.cmd_tx.send(StreamCmd::Unwatch(pane.clone()));
+            }
+        }
+        Ok(())
+    }
+
+    /// Resize for reflow. With a streamer attached this sets the *client*
+    /// size (`refresh-client -C`) — tmux reflows the window to the latest
+    /// client (§4.3). Without one it falls back to `resize-window`.
     pub async fn resize(&self, pane: &PaneId, cols: u16, rows: u16) -> Result<()> {
+        if let Ok(session) = self.resolve_session(pane).await {
+            if let Some(handle) = self.streamers.lock().await.get(&session) {
+                if handle.is_alive() {
+                    let _ = handle.cmd_tx.send(StreamCmd::SetSize { cols, rows });
+                    return Ok(());
+                }
+            }
+        }
         let argv = vec![
             "resize-window".to_string(),
             "-t".to_string(),
@@ -135,6 +190,20 @@ impl Engine {
         ];
         self.transport.exec(&argv).await?;
         Ok(())
+    }
+
+    /// Which session a pane belongs to. `sess:win.pane` targets parse
+    /// directly; `%id` panes are looked up across all sessions.
+    async fn resolve_session(&self, pane: &PaneId) -> Result<String> {
+        if let Some((session, _)) = pane.0.split_once(':') {
+            return Ok(session.trim_start_matches('=').to_string());
+        }
+        let out = self.transport.exec(&cmd::list_panes(None)).await?;
+        parse_panes(&out)?
+            .into_iter()
+            .find(|p| p.id == *pane)
+            .map(|p| p.session)
+            .ok_or_else(|| EngineError::NotFound(format!("pane {pane}")))
     }
 
     /// Find a pane by tmux target string or pane id within a session's panes.

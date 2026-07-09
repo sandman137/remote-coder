@@ -12,6 +12,7 @@ mod engine;
 pub mod error;
 pub mod event;
 pub mod grid;
+mod stream;
 pub mod tmux;
 pub mod transport;
 

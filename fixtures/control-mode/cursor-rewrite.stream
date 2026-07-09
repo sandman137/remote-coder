@@ -1,0 +1,4 @@
+%output %0 tick 1\015\012tick 2\015\012
+%output %0 \033[1A\015\033[Krewritten line\015\012
+%output %0 \033[36m\342\227\217\033[0m done
+%exit
