@@ -12,7 +12,7 @@ use crate::tmux::keys::{parse_key_string, KeyInput};
 use crate::tmux::{
     cmd, parse_geometry, parse_panes, parse_sessions, PaneId, PaneInfo, SessionInfo,
 };
-use crate::transport::{LocalTransport, Transport};
+use crate::transport::{shell_quote, LocalTransport, SshTransport, Transport};
 
 /// How to reach the tmux server (DESIGN.md §7.1).
 #[derive(Debug, Clone)]
@@ -20,14 +20,8 @@ pub enum ConnConfig {
     /// Same-host tmux. `socket` = `tmux -L <socket>` (tests use a private
     /// server); `None` = the default server.
     Local { socket: Option<String> },
-    /// SSH via russh with host-key pinning — arrives in Phase 5.
-    Ssh {
-        host: String,
-        port: u16,
-        user: String,
-        key_path: Option<String>,
-        hostkey_fp: Option<String>,
-    },
+    /// SSH via russh: key-only auth + host-key pinning (§8.1).
+    Ssh(crate::transport::SshParams),
 }
 
 pub struct Engine {
@@ -51,9 +45,7 @@ impl Engine {
     pub async fn connect_with_registry(cfg: ConnConfig, registry: Registry) -> Result<Engine> {
         let transport: Arc<dyn Transport> = match cfg {
             ConnConfig::Local { socket } => Arc::new(LocalTransport::new(socket)),
-            ConnConfig::Ssh { .. } => {
-                return Err(TransportError::Unsupported("SshTransport arrives in Phase 5").into())
-            }
+            ConnConfig::Ssh(params) => Arc::new(SshTransport::connect(&params).await?),
         };
         Ok(Engine {
             transport,
@@ -305,16 +297,4 @@ impl Engine {
             .cloned()
             .ok_or_else(|| EngineError::NotFound(format!("pane {needle} in session {session}")))
     }
-}
-
-/// Single-quote a string for the POSIX shell that tmux hands new-window
-/// commands to.
-fn shell_quote(s: &str) -> String {
-    if !s.is_empty()
-        && s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || "-_./=:".contains(c))
-    {
-        return s.to_string();
-    }
-    format!("'{}'", s.replace('\'', r"'\''"))
 }

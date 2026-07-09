@@ -6,8 +6,11 @@
 //! identical code.
 
 mod local;
+mod ssh;
 
 pub use local::LocalTransport;
+pub(crate) use ssh::shell_quote;
+pub use ssh::{SshParams, SshTransport};
 
 use crate::error::TransportError;
 

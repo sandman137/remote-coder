@@ -25,6 +25,7 @@ pub use event::{Button, EngineEvent, EventStream, PromptKind};
 pub use grid::{Cell, CellAttrs, Color, GridSnapshot};
 pub use tmux::keys::{parse_key_string, KeyInput};
 pub use tmux::{PaneId, PaneInfo, SessionInfo};
+pub use transport::SshParams;
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")

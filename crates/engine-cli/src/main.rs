@@ -37,6 +37,14 @@ struct Cli {
     #[arg(long, global = true)]
     user: Option<String>,
 
+    /// SSH identity file (ed25519), e.g. .dev/sshd/client_ed25519
+    #[arg(long, global = true)]
+    key: Option<String>,
+
+    /// Pinned host key fingerprint ("SHA256:…"); omit for trust-on-first-use
+    #[arg(long, global = true)]
+    hostkey_fp: Option<String>,
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -67,20 +75,28 @@ fn conn_config(cli: &Cli) -> Result<ConnConfig> {
         "local" => Ok(ConnConfig::Local {
             socket: cli.socket.clone(),
         }),
-        "ssh" => Ok(ConnConfig::Ssh {
-            host: cli
-                .host
-                .clone()
-                .context("--host is required for --transport ssh")?,
-            port: cli.port,
-            user: cli
-                .user
-                .clone()
-                .or_else(|| std::env::var("USER").ok())
-                .context("--user is required for --transport ssh")?,
-            key_path: None,
-            hostkey_fp: None,
-        }),
+        "ssh" => {
+            let mut params = engine::SshParams::new(
+                cli.host
+                    .clone()
+                    .context("--host is required for --transport ssh")?,
+                cli.port,
+                cli.user
+                    .clone()
+                    .or_else(|| std::env::var("USER").ok())
+                    .context("--user is required for --transport ssh")?,
+                cli.key
+                    .clone()
+                    .context("--key <identity file> is required for --transport ssh")?,
+            );
+            params.hostkey_fp = cli.hostkey_fp.clone();
+            if params.hostkey_fp.is_none() {
+                eprintln!(
+                    "warning: no --hostkey-fp pinned; trusting this connection's host key (TOFU)"
+                );
+            }
+            Ok(ConnConfig::Ssh(params))
+        }
         other => bail!("unknown transport {other:?} (expected local|ssh)"),
     }
 }

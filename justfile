@@ -23,7 +23,8 @@ sshd *ARGS:
 
 # same TUI, but over SshTransport -> loopback -> tmux (Phase 5+)
 tui-ssh:
-    cargo run -p engine-cli -- --transport ssh --host 127.0.0.1 --port 2222 --session agents tui
+    cargo run -p engine-cli -- --transport ssh --host 127.0.0.1 --port 2222 \
+        --key .dev/sshd/client_ed25519 --session agents tui
 
 # --- notifications ---
 
