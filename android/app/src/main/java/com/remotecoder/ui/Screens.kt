@@ -14,8 +14,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,11 +54,19 @@ fun PaneListScreen(
     session: String,
     panes: List<PaneInfoFfi>,
     attention: Set<String>,
+    error: String? = null,
     onOpen: (PaneInfoFfi) -> Unit,
     onRefresh: () -> Unit,
 ) {
     Scaffold(topBar = {
-        TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White), title = {
+        TopAppBar(
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+            actions = {
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = Astro.violet)
+                }
+            },
+            title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painterResource(R.drawable.astro_bust),
@@ -79,7 +89,61 @@ fun PaneListScreen(
             }
         })
     }) { pad ->
+        if (panes.isEmpty()) {
+            // Empty session — tell the user exactly how to get an agent here.
+            Column(
+                Modifier.padding(pad).fillMaxSize().padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Image(
+                    painterResource(R.drawable.astro_bust),
+                    contentDescription = null,
+                    modifier = Modifier.size(96.dp).clip(CircleShape),
+                )
+                Text(
+                    "No agents yet",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                Text(
+                    "Connected to '$session', but nothing is running in it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Astro.muted,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Text(
+                    "On your dev box:\n\n  tmux attach -t $session\n\nthen launch  claude  (or codex).\nEach tmux window appears here as a pane.",
+                    fontFamily = FontFamily.Monospace, fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+                if (error != null) {
+                    Text(
+                        error,
+                        color = Astro.magenta,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                }
+                Button(
+                    onClick = onRefresh,
+                    colors = ButtonDefaults.buttonColors(containerColor = Astro.magenta),
+                    modifier = Modifier.padding(top = 18.dp),
+                ) { Text("Refresh") }
+            }
+            return@Scaffold
+        }
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+            if (error != null) {
+                item {
+                    Text(
+                        error,
+                        color = Astro.magenta,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+            }
             items(panes, key = { it.id }) { pane ->
                 val waiting = pane.id in attention
                 Card(

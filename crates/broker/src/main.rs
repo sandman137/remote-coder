@@ -9,7 +9,7 @@
 //! to stderr and exit 65.
 
 use std::os::unix::process::CommandExt;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use broker::{authorize, Decision, PaneResolver};
 
@@ -80,6 +80,26 @@ fn base_command(opts: &Opts) -> Command {
     cmd
 }
 
+/// Self-heal: recreate the scoped session if it died (tmux kills a session
+/// with its last window). A paired phone should land in an empty session and
+/// see "no panes yet" — never a hard connection error.
+fn ensure_session(opts: &Opts) {
+    let exists = base_command(opts)
+        .args(["has-session", "-t", &format!("={}", opts.session)])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !exists {
+        let _ = base_command(opts)
+            .args(["new-session", "-d", "-s", &opts.session, "-x", "220", "-y", "50"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
 fn main() {
     let opts = parse_opts();
     let original = match std::env::var("SSH_ORIGINAL_COMMAND") {
@@ -93,6 +113,7 @@ fn main() {
     let resolver = TmuxResolver { opts: &opts };
     match authorize(&original, &opts.session, &resolver) {
         Decision::Allowed(argv) => {
+            ensure_session(&opts);
             // exec replaces this process; stdio passes straight through, so
             // control-mode streaming works unchanged behind the broker.
             let err = base_command(&opts).args(&argv).exec();

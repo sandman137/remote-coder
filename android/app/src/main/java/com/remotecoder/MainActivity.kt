@@ -45,6 +45,7 @@ class MainActivity : FragmentActivity() {
                         session = state.session,
                         panes = state.panes,
                         attention = state.attention,
+                        error = state.error,
                         onOpen = vm::openPane,
                         onRefresh = vm::refreshPanes,
                     )

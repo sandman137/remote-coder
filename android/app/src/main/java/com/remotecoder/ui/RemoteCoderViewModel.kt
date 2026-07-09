@@ -114,7 +114,7 @@ class RemoteCoderViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val panes = repo.listPanes(_state.value.session)
-                update { copy(panes = panes) }
+                update { copy(panes = panes, error = null) }
             } catch (e: Exception) {
                 update { copy(error = e.message) }
             }
