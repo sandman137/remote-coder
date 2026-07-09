@@ -23,38 +23,64 @@ The Rust cdylib and Kotlin bindings are produced automatically by Gradle:
 `app/build.gradle.kts` wires `:cargoNdkBuild` (→ `jniLibs/<abi>/libhelm_engine.so`)
 and `:uniffiBindgen` (→ generated `uniffi/helm_engine`) into `preBuild`.
 
-## Build & run (requires the Android toolchain)
+## Build & run
 
-Prerequisites: Android SDK (API 34) + NDK (r26+), `cargo-ndk`
-(`cargo install cargo-ndk`), `ANDROID_NDK_HOME` set, an x86_64 emulator.
+Prerequisites: Android SDK (API 34), NDK (r26+), `cargo-ndk`
+(`cargo install cargo-ndk`), the `x86_64-linux-android` +
+`aarch64-linux-android` Rust targets, `ANDROID_NDK_HOME` set. A
+`local.properties` with `sdk.dir` / `ndk.dir` (gitignored — machine paths).
 
 ```sh
-# from repo root — build the engine .so into jniLibs and install
-just android-so        # cargo ndk build of libhelm_engine.so
-just android-emu       # adb reverse tcp:2222 tcp:2222 && ./gradlew -p android installDebug
+cd android
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<version>
+./gradlew :app:assembleDebug            # full APK, both ABIs (~364 MB debug)
 ```
 
-Emulator flow (DESIGN.md §9 acceptance): the app reaches the host tmux over
-`adb reverse` loopback. Either:
+`preBuild` runs cargo-ndk (→ jniLibs/<abi>/libhelm_engine.so) and
+uniffi-bindgen (→ generated Kotlin) automatically.
 
-- **Pair**: run `helm pair --pair-host 10.0.2.2 --ssh-port 2222` on the host,
-  scan the QR — the device key is generated on-device, the host key pinned,
-  and a forced-command key installed host-side (`broker` scopes to the
-  `agents` session).
-- **Dev shortcut**: the "connect to loopback" button uses `LocalTransport`
-  against an `adb reverse`-exposed socket for quick bring-up.
+**Lean build for the emulator** — a single ABI + release-stripped native lib
+(~77 MB, the `.so` drops from ~150 MB debug to ~8.5 MB):
+
+```sh
+./gradlew :app:assembleDebug -Phelm.rustAbis=x86_64 -Prelease
+```
+
+Emulator flow (DESIGN.md §9): the app reaches the host over the emulator's
+`10.0.2.2` alias (host loopback). Pair with
+`helm pair --pair-host 10.0.2.2 --ssh-port 2222` on the host and scan the QR;
+the device key is generated on-device, the host key pinned, and a
+forced-command key installed host-side (`broker` scopes to the `agents`
+session). A debug-only `helm://connect` deep link drives the same
+pair+connect path without the camera, for automated testing:
+
+```sh
+adb shell am start -a android.intent.action.VIEW -d helm://connect \
+  --es payload '<pair-json>' --es device emu -n com.helm/.MainActivity
+```
 
 ## Verification status
 
-The engine this app drives is **fully tested and green on Linux** (115 Rust
-tests + the Python FFI driver exercising the identical FFI surface these
-Kotlin bindings expose — connect, snapshot with color, streaming via
-poll + callback, send-keys, press-button). Per DESIGN.md §3, a green engine
-over `SshTransport`-to-loopback ≈ a green Android app over the tailnet.
-
-This Android module's own compile/emulator run needs the Android SDK/NDK/
-Gradle, which are **not present in the CI/dev box used to author it**; build
-it on a machine with the toolchain using the commands above.
+- **Toolchain + build: verified on this machine.** SDK 34 + NDK r26 +
+  cargo-ndk + Gradle 8.9 installed; `./gradlew :app:assembleDebug` produces a
+  working APK that packages `libhelm_engine.so` (the real Rust engine) + JNA
+  for arm64-v8a and x86_64, launchable as `com.helm/.MainActivity`. The
+  engine cross-compiles to both Android ABIs (ring crypto included) — the
+  §13 portability guard is green with the real NDK. Building the APK caught
+  three real defects (FfiError `message`↔`Throwable.message` clash, a Compose
+  `Card`/`weight` misuse, the missing x86_64 Rust target), all fixed.
+- **Engine behavior: fully green on Linux** — 115 Rust tests + the Python FFI
+  driver exercising the identical FFI surface these Kotlin bindings expose
+  (connect, snapshot with color, streaming via poll + callback, send-keys,
+  press-button). Per DESIGN.md §3, a green engine over
+  `SshTransport`-to-loopback ≈ a green Android app over the tailnet.
+- **Emulator run: not possible on the authoring host** — it has no hardware
+  virtualization (`/dev/kvm` absent, no `vmx`/`svm` CPU flags), so the
+  emulator falls back to full software instruction translation (QEMU TCG).
+  Android 14 does not reach a usable state that way (after ~20 min a shell
+  `getprop` still times out), and the modern emulator refuses ARM64 images on
+  an x86_64 host. On a KVM-capable machine the lean APK above installs and the
+  `helm://connect` flow runs end to end against the loopback broker/tmux.
 
 ## Remaining hardening (tracked)
 
